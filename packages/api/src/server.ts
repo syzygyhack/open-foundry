@@ -361,6 +361,9 @@ async function main(): Promise<void> {
     // OIDC_JWKS_URI overrides for non-Keycloak issuers (e.g. NHS CIS2).
     // Default: Keycloak-style path. Set OIDC_JWKS_URI for other providers.
     jwksUri: process.env['OIDC_JWKS_URI'] ?? `${oidcIssuer}/protocol/openid-connect/certs`,
+    // Fallback tenant when the IdP token carries no tenant_id claim (e.g. stock
+    // Keycloak); without it, production auth 401s for every user. See issue #1.
+    defaultTenantId: process.env['OIDC_DEFAULT_TENANT'] ?? 'default',
   });
 
   // ── Authorization (OpenFGA) ──
