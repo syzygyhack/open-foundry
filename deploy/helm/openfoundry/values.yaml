@@ -42,6 +42,10 @@ auth:
     clientId: ""
     # Override for non-Keycloak issuers (e.g. NHS CIS2). If empty, uses ${issuer}/protocol/openid-connect/certs
     jwksUri: ""
+    # Opt-in fallback tenant for tokens without a `tenant_id` claim. Empty →
+    # fail-closed (claimless tokens rejected); a real tenant_id claim always wins.
+    # Single-tenant deployments set this (e.g. "default"); multi-tenant leave empty.
+    defaultTenant: ""
     existingSecret: openfoundry-oidc
     secretKeys:
       clientSecret: clientSecret

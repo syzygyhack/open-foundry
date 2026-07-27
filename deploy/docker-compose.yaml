@@ -206,6 +206,10 @@ services:
       OTEL_SERVICE_NAME: api-gateway
       DOMAIN_PACKS: ${DOMAIN_PACKS:-}
       DOMAIN_PACKS_EXTRA_DIRS: ${DOMAIN_PACKS_EXTRA_DIRS:-}
+      # OIDC fallback tenant for tokens without a `tenant_id` claim (production
+      # auth only — see docker-compose.prod-test.yaml). Opt-in; unset → fail-closed
+      # (claimless tokens rejected). Single-tenant deployments set OIDC_DEFAULT_TENANT.
+      OIDC_DEFAULT_TENANT: ${OIDC_DEFAULT_TENANT:-}
       # Deployment policy: platform roles allowed to grant relationships / record
       # consent. Generic default is `admin` only — no NHS roles are forced here.
       # NHS deployments set these in .env (see .env.example):

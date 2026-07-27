@@ -12,6 +12,7 @@
  *   OIDC_ISSUER          — OIDC provider issuer URL (matches Helm configmap)
  *   OIDC_CLIENT_ID       — OIDC client ID
  *   OIDC_JWKS_URI        — JWKS endpoint override for non-Keycloak issuers
+ *   OIDC_DEFAULT_TENANT  — Opt-in fallback tenant for tokens without a tenant_id claim (unset = fail-closed)
  *   OPENFGA_URL          — OpenFGA API URL (matches Helm configmap / docker-compose)
  *   OPENFGA_STORE_ID     — OpenFGA store ID
  *   POSTGRES_URL         — PostgreSQL connection string (with ?sslmode= for TLS)
@@ -361,9 +362,12 @@ async function main(): Promise<void> {
     // OIDC_JWKS_URI overrides for non-Keycloak issuers (e.g. NHS CIS2).
     // Default: Keycloak-style path. Set OIDC_JWKS_URI for other providers.
     jwksUri: process.env['OIDC_JWKS_URI'] ?? `${oidcIssuer}/protocol/openid-connect/certs`,
-    // Fallback tenant when the IdP token carries no tenant_id claim (e.g. stock
-    // Keycloak); without it, production auth 401s for every user. See issue #1.
-    defaultTenantId: process.env['OIDC_DEFAULT_TENANT'] ?? 'default',
+    // Opt-in fallback tenant for IdP tokens that carry no `tenant_id` claim.
+    // Unset (undefined) is normalized to null by configure(), preserving the
+    // documented fail-closed posture (MISSING_TENANT -> 401). Single-tenant
+    // deployments set OIDC_DEFAULT_TENANT=default; multi-tenant deployments leave
+    // it unset and map real tenants via a tenant_id claim. See issue #1.
+    defaultTenantId: process.env['OIDC_DEFAULT_TENANT'],
   });
 
   // ── Authorization (OpenFGA) ──

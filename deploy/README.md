@@ -141,9 +141,13 @@ requirements are easy to miss — each fails with an opaque `401 UNAUTHENTICATED
    `audience = clientId` (`OIDC_CLIENT_ID`) and validates it. Keycloak access
    tokens default to `aud: "account"` and will be **rejected**. Add an
    **audience protocol mapper** that includes your client in the `aud` claim.
-2. **A `tenant_id` claim is mandatory.** `extractUser` throws `MISSING_TENANT`
-   when the tenant claim is absent — and no default tenant is configured. Add a
-   mapper (hardcoded claim or per-user attribute) that emits `tenant_id`.
+2. **A `tenant_id` claim is mandatory (unless a default is opted in).**
+   `extractUser` throws `MISSING_TENANT` when the tenant claim is absent and no
+   default tenant is configured. Either add a mapper (hardcoded claim or per-user
+   attribute) that emits `tenant_id`, or — for a single-tenant deployment — set
+   `OIDC_DEFAULT_TENANT` to opt into a fallback tenant. Leaving it unset preserves
+   the fail-closed default (claimless tokens are rejected); a real `tenant_id`
+   claim always takes precedence when present.
 
 Required token claims:
 
@@ -151,7 +155,7 @@ Required token claims:
 |-------|-------------|
 | `sub` | Subject — used as the actor/user id |
 | `aud` | Must equal `OIDC_CLIENT_ID` |
-| `tenant_id` | Mandatory — request is rejected without it |
+| `tenant_id` | Mandatory unless `OIDC_DEFAULT_TENANT` opts into a fallback tenant — otherwise the request is rejected |
 | `roles` | **Flat top-level array** — the authenticator reads `claims["roles"]` directly (`role-mapping.ts` `resolveRoles`, `DEFAULT_ROLE_MAPPING.claimName = "roles"`). It does **not** descend into Keycloak's nested `realm_access.roles`. Add a Keycloak realm-role mapper (`oidc-usermodel-realm-role-mapper`, `claim.name=roles`, multivalued) — otherwise the actor has no roles and CEL preconditions like `actor.hasRole('clinician')` fail with `PRECONDITION_FAILED` even after OpenFGA passes. |
 
 ### Issuer vs JWKS host split

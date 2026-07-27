@@ -210,6 +210,35 @@ describe("OidcAuthenticator", () => {
     });
   });
 
+  describe("OIDC_DEFAULT_TENANT env wiring (fail-closed posture)", () => {
+    // server.ts wires `defaultTenantId: process.env['OIDC_DEFAULT_TENANT']`, so an
+    // unset env var arrives as `undefined`. configure() normalizes it to null, so a
+    // token without a tenant_id claim must still be rejected (fail-closed).
+    it("stays fail-closed when OIDC_DEFAULT_TENANT is unset (undefined)", async () => {
+      const auth = createAuthenticator({ defaultTenantId: undefined });
+      const token = await signToken({
+        sub: "user-env-unset",
+        name: "Env Unset",
+        email: "u@nhs.net",
+      });
+      await expect(auth.authenticate(token)).rejects.toThrow(AuthenticationError);
+      await expect(auth.authenticate(token)).rejects.toThrow(
+        "no default tenant is configured",
+      );
+    });
+
+    it("opts into a fallback tenant when OIDC_DEFAULT_TENANT is set", async () => {
+      const auth = createAuthenticator({ defaultTenantId: "default" });
+      const token = await signToken({
+        sub: "user-env-set",
+        name: "Env Set",
+        email: "s@nhs.net",
+      });
+      const user = await auth.authenticate(token);
+      expect(user.tenantId).toBe("default");
+    });
+  });
+
   describe("CIS2 role mapping", () => {
     it("maps CIS2 role codes to platform roles", async () => {
       const auth = createAuthenticator({

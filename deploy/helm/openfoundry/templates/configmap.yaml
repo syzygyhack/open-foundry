@@ -22,6 +22,9 @@ data:
   {{- if .Values.auth.oidc.jwksUri }}
   OIDC_JWKS_URI: {{ .Values.auth.oidc.jwksUri | quote }}
   {{- end }}
+  {{- if .Values.auth.oidc.defaultTenant }}
+  OIDC_DEFAULT_TENANT: {{ .Values.auth.oidc.defaultTenant | quote }}
+  {{- end }}
   OPENFGA_URL: {{ .Values.authz.openfga.url | quote }}
   {{/* HELM-06: OPENFGA_STORE_ID is infrastructure config, not a secret */}}
   OPENFGA_STORE_ID: {{ .Values.authz.openfga.storeId | quote }}
