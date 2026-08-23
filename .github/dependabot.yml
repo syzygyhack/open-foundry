@@ -31,12 +31,13 @@ updates:
         dependency-type: production
         patterns: ['*']
 
-  - package-ecosystem: gomod
-    directory: /packages/cel-evaluator
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: 'chore(deps)'
+  # gomod is deliberately absent. Dependabot's Go helper currently fails on this
+  # module with `go_module_path_mismatch` (it misreads a "go: downloading" line
+  # as a module path), so the ecosystem would fail every week and train everyone
+  # to ignore a red Dependabot run. Go dependencies are covered instead by the
+  # trivy image scan in CI plus the scheduled drift scan, which is strictly
+  # broader here: it catches Go *stdlib* advisories that come from the toolchain
+  # rather than go.mod, and Dependabot cannot see those at all.
 
   - package-ecosystem: docker
     directory: /packages/cel-evaluator
