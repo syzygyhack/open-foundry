@@ -17,31 +17,56 @@ jobs:
   # does not typecheck or build the container images — so v0.2.0 shipped with a
   # cel-evaluator image that could not build. Verify the tagged SHA first, and
   # only publish once every artifact exists.
+  # A tag must not publish unless the FULL CI matrix passed for this exact SHA.
+  # An earlier partial gate (build + typecheck + unit tests + image builds) still
+  # let a tag through without Postgres integration, stack integration, the
+  # production-mode enforcement suites, Helm lint or the image scan. Rather than
+  # duplicate those here — doubling release time and drifting from ci.yml — wait
+  # for the CI workflow run on the tagged commit and require every job green.
   verify:
-    name: Verify tagged commit
+    name: Require full CI green for the tagged commit
     runs-on: ubuntu-latest
-    env:
-      POSTGRES_PASSWORD: postgres
-      KEYCLOAK_ADMIN_PASSWORD: admin
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        run: pnpm run build
-      # Covers test files, which tsconfig.build.json excludes.
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Unit tests
-        run: pnpm run test
-      # The check that would have caught the v0.2.0 breakage.
-      - name: Build container images
-        run: docker compose -f deploy/docker-compose.yaml build
+      - name: Wait for CI on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Tags are usually pushed at a commit CI has already run on; allow time
+          # for the run to appear and finish if the tag raced the push.
+          for attempt in $(seq 1 60); do
+            run=$(gh run list --repo "$REPO" --workflow=CI --limit 30 \
+                    --json databaseId,headSha,status,conclusion \
+                    --jq "[.[] | select(.headSha == \"$SHA\")] | first // empty")
+            if [ -z "$run" ]; then
+              echo "attempt $attempt: no CI run for $SHA yet"
+            else
+              status=$(echo "$run" | jq -r .status)
+              conclusion=$(echo "$run" | jq -r '.conclusion // ""')
+              id=$(echo "$run" | jq -r .databaseId)
+              echo "attempt $attempt: CI run $id status=$status conclusion=$conclusion"
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" != "success" ]; then
+                  echo "::error::CI concluded '$conclusion' for $SHA — refusing to publish."
+                  exit 1
+                fi
+                # Guard against a partially-successful matrix.
+                failed=$(gh run view "$id" --repo "$REPO" --json jobs \
+                          --jq '[.jobs[] | select(.conclusion != "success")] | length')
+                if [ "$failed" != "0" ]; then
+                  echo "::error::$failed CI job(s) did not succeed for $SHA — refusing to publish."
+                  exit 1
+                fi
+                echo "CI fully green for $SHA (run $id)."
+                exit 0
+              fi
+            fi
+            sleep 30
+          done
+          echo "::error::Timed out waiting for a completed CI run on $SHA."
+          exit 1
 
   publish:
     name: Publish release
@@ -86,7 +111,7 @@ jobs:
 
       # Created only now, with every asset attached in one call, so a failure
       # above cannot leave a published release missing its artifacts.
-      - name: Create release with artifacts
+      - name: Create DRAFT release with artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -106,9 +131,11 @@ jobs:
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" "${assets[@]}" --clobber
           else
+            # Draft: nothing is publicly visible until provenance succeeds.
             gh release create "${{ github.ref_name }}" \
               --title "${{ github.ref_name }}" \
               --generate-notes \
+              --draft \
               $PRERELEASE \
               "${assets[@]}"
           fi
@@ -123,3 +150,10 @@ jobs:
             packages/api/spec/schema.graphql
             packages/api/spec/asyncapi.yaml
             sbom.cyclonedx.json
+
+      # Only now is the release made visible. A failure anywhere above leaves a
+      # draft, not a published release advertising assurance it does not have.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false
