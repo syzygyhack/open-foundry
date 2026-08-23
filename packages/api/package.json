@@ -26,7 +26,8 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@apollo/server": "^4.11.0",
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express4": "^1.1.2",
     "@graphql-tools/schema": "^10.1.0",
     "@openfga/sdk": "^0.9.7",
     "@openfoundry/actions": "workspace:*",

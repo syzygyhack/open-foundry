@@ -31,7 +31,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { GraphQLError } from 'graphql';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { MemoryStorageProvider } from '@openfoundry/storage-memory';
 import { PostgresStorageProvider, PostgresAuditStore, PostgresConsentStore, PostgresSchemaRegistry, PostgresObjectSetStore } from '@openfoundry/storage-postgres';
