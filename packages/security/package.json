@@ -19,10 +19,10 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@openfga/sdk": "^0.9.1",
+    "@openfga/sdk": "^0.9.7",
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/spi": "workspace:*",
-    "jose": "^6.0.0"
+    "jose": "^6.2.9"
   },
   "license": "Apache-2.0",
   "devDependencies": {
