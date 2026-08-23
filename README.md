@@ -103,7 +103,7 @@ Domain Packs are composable schema and configuration modules that specialise the
 
 | Pack | Namespace | Object Types | Actions | Connectors |
 |------|-----------|-------------|---------|------------|
-| **NHS Acute** | `nhs.acute` | Patient, Ward, Bed, Consultant, DischargeRecord | AdmitPatient, DischargePatient, TransferWard, CleanBed, RegisterPatient | PAS (JDBC + CDC) |
+| **NHS Acute** | `nhs.acute` | Patient, Ward, Bed, Consultant, DischargeRecord, Transfer, Staff | AdmitPatient, DischargePatient, TransferWard, CleanBed, RegisterPatient | PAS (JDBC + CDC) |
 | **AML** | `aml` | Customer, Transaction, Alert, Case, Account, SuspiciousActivityReport | AssignAlertToCase, FlagTransaction, FreezeAccount, OpenCase, FileReport, SubmitReport | TMS (JDBC) |
 | **Supply Chain** | `supply.chain` | Product, Supplier, Shipment, Facility, InventoryRecord, PurchaseOrder | ShipOrder, ReceiveShipment, CreateOrder, CancelOrder | ERP (JDBC + CDC) |
 
@@ -173,7 +173,7 @@ The ODL compiler generates a complete GraphQL API, REST endpoints, OpenFGA autho
 
 ## Packages
 
-The monorepo contains 20 packages across four workspace roots:
+The monorepo is organised across four workspace roots:
 
 ### Core Platform (`packages/`)
 
@@ -196,10 +196,10 @@ The monorepo contains 20 packages across four workspace roots:
 
 | Pack | Namespace | Contents |
 |------|-----------|----------|
-| `@openfoundry/domain-pack-core` | `openfoundry.core` | Base interfaces, 6 custom scalars |
-| `@openfoundry/domain-pack-nhs-acute` | `nhs.acute` | 7 ODL schemas, 5 actions, 1 connector, permissions |
-| `@openfoundry/domain-pack-aml` | `aml` | 8 ODL schemas, 6 actions, 1 connector, permissions |
-| `@openfoundry/domain-pack-supply-chain` | `supply.chain` | 8 ODL schemas, 4 actions, 1 connector, permissions |
+| `@openfoundry/domain-pack-core` | `openfoundry.core` | Base interfaces and custom scalars |
+| `@openfoundry/domain-pack-nhs-acute` | `nhs.acute` | ODL schema, actions, PAS connector, permissions |
+| `@openfoundry/domain-pack-aml` | `aml` | ODL schema, actions, TMS connector, permissions |
+| `@openfoundry/domain-pack-supply-chain` | `supply.chain` | ODL schema, actions, ERP connector, permissions |
 
 ### Tests (`tests/`)
 

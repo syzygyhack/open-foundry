@@ -1,7 +1,9 @@
 # API Specification Artifacts
 
 Open Foundry publishes three machine-readable API contracts. These are generated
-from the merged schema at build time and attached to every GitHub release.
+from the merged schema at build time and attached to every GitHub release,
+alongside a CycloneDX SBOM and a build provenance attestation (see
+[`SECURITY.md`](../SECURITY.md#supply-chain)).
 
 ## Artifacts
 
@@ -13,7 +15,10 @@ from the merged schema at build time and attached to every GitHub release.
 
 ## Where to Find Them
 
-- **Release assets** — attached to every `v*` tagged release on GitHub
+- **Release assets** — attached to every `v*` tagged release on GitHub. The
+  release also carries `sbom.cyclonedx.json`; artifacts are attested, so
+  `gh attestation verify <file> --repo syzygyhack/open-foundry` confirms they
+  were built by the release workflow from that tag.
 - **Local generation** — `pnpm --filter @openfoundry/api spec:all` writes all three to `packages/api/spec/`
 - **Live endpoint** — `GET /api/v1/openapi.json` returns the OpenAPI spec from the running server
 

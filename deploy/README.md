@@ -1,6 +1,6 @@
 # Open Foundry — Development Deployment
 
-Local development environment with all 13 services via Docker Compose.
+Local development environment via Docker Compose.
 
 ## Prerequisites
 
@@ -41,6 +41,7 @@ open http://localhost:4000/graphql
 | debezium | 8083 | Change Data Capture |
 | otel-collector | 4317 | OpenTelemetry traces/metrics |
 | keycloak | 8180 | Identity provider (OIDC) |
+| openfga-migrate | — | One-shot init container: applies the OpenFGA datastore migrations before `openfga` starts |
 
 ## Init Script
 
