@@ -12,6 +12,8 @@ own subdirectory so it stays clearly separable.
 | [`first-domain-pack.md`](first-domain-pack.md) | **Tutorial — build your first domain pack.** A worked, non-healthcare example (library lending) covering object types, links, governed actions, permissions and seeds. Start here. |
 | [`external-domain-packs.md`](external-domain-packs.md) | Domain-pack reference — connectors, capabilities, configuration, and troubleshooting. Read after the tutorial. |
 | [`api-spec.md`](api-spec.md) | API contract artifacts (OpenAPI, GraphQL SDL, AsyncAPI) and client codegen. |
+| [`repository-map.md`](repository-map.md) | What lives in each package, the storage provider matrix, and how the test suites are layered. |
+| [`project-history.md`](project-history.md) | How the codebase was built. |
 
 Also useful, outside this directory:
 

@@ -280,7 +280,11 @@ async function main(): Promise<void> {
 
   // ── Bootstrap Seeds ──
   // Apply seed data from domain packs (idempotent — skips objects that already exist).
-  // Runs through ObjectManager/LinkManager for full validation, events, and audit.
+  // Runs through ObjectManager/LinkManager for full validation and event
+  // emission. Note this path is OUTSIDE the action pipeline, so it performs no
+  // authorization or consent check and writes no audit record — audit is
+  // emitted by the action executor and the governance routers, not by the
+  // object/link managers.
   // Objects can declare a `ref` label; links reference objects by `ref` or literal ID.
   //
   // Seeded links bypass the action executor, so their ReBAC tuples aren't minted
