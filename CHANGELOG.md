@@ -10,6 +10,34 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-23
+
+Patch release. The source at `v0.2.0` cannot build its container images; nothing
+else about that release is affected, and its published API contract artifacts
+remain valid.
+
+### Fixed
+
+- **`cel-evaluator` image build failed.** The health-probe tools module chains
+  several `go get` calls, which left `go.sum` without an entry for
+  `golang.org/x/sys/unix` (reached through gRPC internals), so `go build` failed
+  and `docker compose build` could not produce the image. The build now records
+  the resolved sums.
+
+### Security
+
+- Test-toolchain advisories cleared (vitest and its transitive `vite`, `rollup`,
+  `postcss`, `nanoid`, `picomatch` dependencies). These never shipped in the
+  container images, but they execute in CI.
+- Both CI workflows now verify the Trivy download against its published
+  checksums instead of piping an unverified tarball into `tar` as root.
+
+### Added
+
+- Scheduled daily security scan that files an issue when newly published CVEs
+  affect unchanged dependencies, so drift no longer surfaces as a failed build on
+  an unrelated change.
+
 ## [0.2.0] - 2026-08-23
 
 The theme of this release is **making the platform genuinely domain-neutral** and
@@ -103,7 +131,8 @@ in-memory providers, ontology engine, action framework, security layer
 (OIDC/OpenFGA/consent/audit), sync engine, GraphQL/REST/FHIR APIs, Helm chart,
 and the NHS Acute, AML, and Supply Chain domain packs.
 
-[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/syzygyhack/open-foundry/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/syzygyhack/open-foundry/compare/v0.1.0-rc.3...v0.2.0
 [0.1.0-rc.3]: https://github.com/syzygyhack/open-foundry/releases/tag/v0.1.0-rc.3
 [#1]: https://github.com/syzygyhack/open-foundry/issues/1
