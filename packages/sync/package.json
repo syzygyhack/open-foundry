@@ -25,10 +25,10 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
-    "@types/node": "^25.2.2",
+    "@types/node": "^26.2.0",
     "@types/pg": "^8.11.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.2.7"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
   "files": [
     "dist"

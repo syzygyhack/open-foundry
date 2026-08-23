@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@openfoundry/odl": "workspace:*",
-    "@types/node": "^22.0.0",
-    "vitest": "^3.2.7"
+    "@types/node": "^26.2.0",
+    "vitest": "^4.1.11"
   }
 }
