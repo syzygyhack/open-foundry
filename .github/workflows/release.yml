@@ -13,50 +13,56 @@ permissions:
   attestations: write
 
 jobs:
-  build-and-release:
+  # A tag used to publish straight from `pnpm run build && pnpm run test`, which
+  # does not typecheck or build the container images — so v0.2.0 shipped with a
+  # cel-evaluator image that could not build. Verify the tagged SHA first, and
+  # only publish once every artifact exists.
+  verify:
+    name: Verify tagged commit
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: postgres
+      KEYCLOAK_ADMIN_PASSWORD: admin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
           cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm run build
+      # Covers test files, which tsconfig.build.json excludes.
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Unit tests
+        run: pnpm run test
+      # The check that would have caught the v0.2.0 breakage.
+      - name: Build container images
+        run: docker compose -f deploy/docker-compose.yaml build
 
+  publish:
+    name: Publish release
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build
 
-      - name: Run tests
-        run: pnpm run test
-
       - name: Generate spec artifacts
         run: pnpm --filter @openfoundry/api spec:all
 
-      - name: Create release if it does not exist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Mark SemVer pre-release tags (containing a hyphen, e.g. v0.1.0-rc.2)
-          # as GitHub pre-releases so they don't claim the "Latest" badge.
-          PRERELEASE=""
-          case "${{ github.ref_name }}" in
-            *-*) PRERELEASE="--prerelease" ;;
-          esac
-          gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || \
-            gh release create "${{ github.ref_name }}" \
-              --title "${{ github.ref_name }}" \
-              --generate-notes \
-              $PRERELEASE
-
-      # An SBOM lets consumers answer "is this release affected by CVE-X?"
-      # without rebuilding it. Generated with trivy (a single static binary, no
-      # native toolchain) from the resolved pnpm workspace, so it reflects what
-      # actually shipped rather than the declared version ranges.
       - name: Install trivy (checksum verified)
         env:
           TRIVY_VERSION: '0.71.0'
@@ -69,6 +75,8 @@ jobs:
           grep " ${tarball}\$" checksums.txt | sha256sum -c -
           sudo tar xz -C /usr/local/bin -f "$tarball" trivy
 
+      # An SBOM lets consumers answer "is this release affected by CVE-X?"
+      # without rebuilding it, generated from the resolved workspace.
       - name: Generate SBOM (CycloneDX)
         run: |
           set -euo pipefail
@@ -76,19 +84,37 @@ jobs:
             --output sbom.cyclonedx.json --quiet .
           node -e "const s=require('./sbom.cyclonedx.json');const n=(s.components||[]).length;if(!n)throw new Error('SBOM has no components');console.log('SBOM',s.specVersion,'components:',n)"
 
-      - name: Upload spec artifacts + SBOM to release
+      # Created only now, with every asset attached in one call, so a failure
+      # above cannot leave a published release missing its artifacts.
+      - name: Create release with artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" \
-            packages/api/spec/openapi.yaml \
-            packages/api/spec/schema.graphql \
-            packages/api/spec/asyncapi.yaml \
-            sbom.cyclonedx.json \
-            --clobber
+          set -euo pipefail
+          # SemVer pre-release tags (containing a hyphen) are marked as GitHub
+          # pre-releases so they do not claim the "Latest" badge.
+          PRERELEASE=""
+          case "${{ github.ref_name }}" in
+            *-*) PRERELEASE="--prerelease" ;;
+          esac
+          assets=(
+            packages/api/spec/openapi.yaml
+            packages/api/spec/schema.graphql
+            packages/api/spec/asyncapi.yaml
+            sbom.cyclonedx.json
+          )
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" "${assets[@]}" --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --generate-notes \
+              $PRERELEASE \
+              "${assets[@]}"
+          fi
 
-      # Signed, verifiable statement that these artifacts were produced by this
-      # workflow from this commit: `gh attestation verify <file> --repo <repo>`.
+      # Signed, verifiable statement that these artifacts came from this
+      # workflow at this commit: `gh attestation verify <file> --repo <repo>`.
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
