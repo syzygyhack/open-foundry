@@ -1,8 +1,8 @@
 # Build stage
 # Pinned to a patch release so the baked Go stdlib stays ahead of known CVEs
-# (>=1.25.11 fixes CVE-2026-42504; >=1.25.12 fixes CVE-2026-39822, the os.Root
-# symlink-following flaw); bump deliberately, not via a floating tag.
-FROM golang:1.25.12-alpine AS builder
+# (>=1.25.11 fixes CVE-2026-42504; >=1.25.12 the os.Root symlink flaw; >=1.25.13
+# CVE-2026-33818); bump deliberately, not via a floating tag.
+FROM golang:1.25.13-alpine AS builder
 
 WORKDIR /app
 
@@ -28,6 +28,7 @@ RUN mkdir -p /tools && cd /tools \
     && GOFLAGS=-mod=mod go get github.com/grpc-ecosystem/grpc-health-probe@v0.4.53 \
     && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.82.1 \
     && GOFLAGS=-mod=mod go get golang.org/x/text@v0.39.0 \
+    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.56.0 \
     && CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
 
