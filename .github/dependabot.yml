@@ -1,0 +1,46 @@
+version: 2
+
+updates:
+  # Actions are pinned to commit SHAs for supply-chain integrity, which means
+  # they cannot float to picked-up security fixes — Dependabot is what keeps the
+  # pins current. It rewrites the SHA and the trailing version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'ci'
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      # One PR per ecosystem area keeps the review load sane in a 19-package
+      # workspace; security updates still arrive individually and immediately.
+      dev-tooling:
+        dependency-type: development
+        patterns: ['*']
+      production:
+        dependency-type: production
+        patterns: ['*']
+
+  - package-ecosystem: gomod
+    directory: /packages/cel-evaluator
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: docker
+    directory: /packages/cel-evaluator
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'

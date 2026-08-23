@@ -7,16 +7,20 @@ on:
 
 permissions:
   contents: write
+  # id-token + attestations are required to publish build provenance; the
+  # attestation is verifiable with `gh attestation verify`.
+  id-token: write
+  attestations: write
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -49,7 +53,30 @@ jobs:
               --generate-notes \
               $PRERELEASE
 
-      - name: Upload spec artifacts to release
+      # An SBOM lets consumers answer "is this release affected by CVE-X?"
+      # without rebuilding it. Generated with trivy (a single static binary, no
+      # native toolchain) from the resolved pnpm workspace, so it reflects what
+      # actually shipped rather than the declared version ranges.
+      - name: Install trivy (checksum verified)
+        env:
+          TRIVY_VERSION: '0.71.0'
+        run: |
+          set -euo pipefail
+          base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL -o "$tarball" "$base/$tarball"
+          curl -fsSL -o checksums.txt "$base/trivy_${TRIVY_VERSION}_checksums.txt"
+          grep " ${tarball}\$" checksums.txt | sha256sum -c -
+          sudo tar xz -C /usr/local/bin -f "$tarball" trivy
+
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          set -euo pipefail
+          trivy fs --format cyclonedx --scanners license \
+            --output sbom.cyclonedx.json --quiet .
+          node -e "const s=require('./sbom.cyclonedx.json');const n=(s.components||[]).length;if(!n)throw new Error('SBOM has no components');console.log('SBOM',s.specVersion,'components:',n)"
+
+      - name: Upload spec artifacts + SBOM to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -57,4 +84,16 @@ jobs:
             packages/api/spec/openapi.yaml \
             packages/api/spec/schema.graphql \
             packages/api/spec/asyncapi.yaml \
+            sbom.cyclonedx.json \
             --clobber
+
+      # Signed, verifiable statement that these artifacts were produced by this
+      # workflow from this commit: `gh attestation verify <file> --repo <repo>`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            packages/api/spec/openapi.yaml
+            packages/api/spec/schema.graphql
+            packages/api/spec/asyncapi.yaml
+            sbom.cyclonedx.json

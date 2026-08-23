@@ -63,6 +63,28 @@ revised at 1.0.
 | Latest release | Yes |
 | Older releases / `main` | No — pin a release rather than tracking `main` |
 
+## Supply chain
+
+Each tagged release ships:
+
+- **A CycloneDX SBOM** (`sbom.cyclonedx.json`), generated from the resolved
+  workspace so it reflects what shipped rather than declared version ranges.
+- **Build provenance attestation**, verifiable against this repository:
+
+  ```bash
+  gh attestation verify sbom.cyclonedx.json --repo syzygyhack/open-foundry
+  ```
+
+In the build pipeline:
+
+- GitHub Actions are pinned to **commit SHAs**, not mutable tags, and kept
+  current by Dependabot.
+- The Trivy binary is verified against its published checksums before use.
+- CI fails on HIGH/CRITICAL container vulnerabilities, and a scheduled daily scan
+  files an issue when newly published CVEs affect unchanged dependencies.
+- Secret scanning with push protection and Dependabot security updates are
+  enabled on the repository.
+
 ## Security posture and its limits
 
 Please read this before relying on the platform for sensitive data.
