@@ -17,7 +17,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.0",
-    "vitest": "^3.0.0",
+    "vitest": "^3.2.7",
     "ws": "^8.18.0"
   }
 }
