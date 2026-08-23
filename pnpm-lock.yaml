@@ -23,8 +23,8 @@ importers:
   .:
     devDependencies:
       turbo:
-        specifier: ^2.4.0
-        version: 2.8.3
+        specifier: ^2.9.14
+        version: 2.9.14
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -41,7 +41,7 @@ importers:
         specifier: ^22.0.0
         version: 22.19.10
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
       yaml:
         specifier: ^2.8.0
@@ -56,7 +56,7 @@ importers:
         specifier: ^22.0.0
         version: 22.19.10
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
   domain-packs/nhs-acute:
@@ -71,7 +71,7 @@ importers:
         specifier: ^22.0.0
         version: 22.19.10
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
       yaml:
         specifier: ^2.8.0
@@ -89,7 +89,7 @@ importers:
         specifier: ^22.0.0
         version: 22.19.10
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
       yaml:
         specifier: ^2.8.0
@@ -126,7 +126,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/api:
@@ -220,7 +220,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/engine:
@@ -245,7 +245,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/observability:
@@ -276,7 +276,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@25.2.2)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/odl:
@@ -295,7 +295,7 @@ importers:
         specifier: ^22.0.0
         version: 22.19.10
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/sdk-typescript: {}
@@ -322,13 +322,13 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@20.19.33)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/spi:
     devDependencies:
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@25.2.2)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/storage-memory:
@@ -338,7 +338,7 @@ importers:
         version: link:../spi
     devDependencies:
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@25.2.2)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/storage-postgres:
@@ -363,7 +363,7 @@ importers:
         specifier: ^8.11.0
         version: 8.16.0
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/sync:
@@ -391,7 +391,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@25.2.2)(tsx@4.21.0)(yaml@2.8.2)
 
   tests/integration:
@@ -434,7 +434,7 @@ importers:
         version: link:../../packages/sync
     devDependencies:
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@25.2.2)(tsx@4.21.0)(yaml@2.8.2)
 
   tests/spi-conformance:
@@ -447,7 +447,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/storage-memory
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@25.2.2)(tsx@4.21.0)(yaml@2.8.2)
 
   tools/seed:
@@ -462,7 +462,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
       vitest:
-        specifier: ^3.2.7
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.19.10)(tsx@4.21.0)(yaml@2.8.2)
 
 packages:
@@ -1121,6 +1121,36 @@ packages:
   '@rollup/rollup-win32-x64-msvc@4.62.5':
     resolution: {integrity: sha512-/gDJaRs4gl0NPIwqCz+6PkpmhhjRAD2j6P4rSNHBzUkO3naEx2mIU0pRle1vUNRQ7mE/+8OOeXLTv/J56FKiQg==}
     cpu: [x64]
+    os: [win32]
+
+  '@turbo/darwin-64@2.9.14':
+    resolution: {integrity: sha512-t7QiPflaEyBE4oayeZtSmu4mEfjgIrcNlNNl1z1dmIVPqEdtA7+CfTf8d7KXsOGPh6aNgWjKxyvQg9uGfDQF+A==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@turbo/darwin-arm64@2.9.14':
+    resolution: {integrity: sha512-d23147mC9BsCPA9mJ0h/ubcpbRgcJBXbcG3+Vq7YLhjz3IXuvQsJ1UXH8f4MD76ZjJ4m/E4aRdJV+MW88CDfbw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@turbo/linux-64@2.9.14':
+    resolution: {integrity: sha512-P3ZKB5tuUDdDQWuAsACGUR1qv9W7BNWxdxqVJ0kZNuNNPRaVYTPPikLcp79+GiEcW3npsR+KyP38lnQiBc5aSA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@turbo/linux-arm64@2.9.14':
+    resolution: {integrity: sha512-ZRTlzcUMrrPv9ZuDzRF9n60Ym13bKeG9jDB8WjxyLhWNzV+AJQN+zdpIk3NJYf2zQsGUm1mNar2P0elRzLw25g==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@turbo/windows-64@2.9.14':
+    resolution: {integrity: sha512-exanwN6sIduZwykYeiTQj8kCmOhazP5WOz3bvXMcYtjhL6Z3iRWLewKrXCBq0bqwSP3iBMb/AerRCnHI4lx46A==}
+    cpu: [x64]
+    os: [win32]
+
+  '@turbo/windows-arm64@2.9.14':
+    resolution: {integrity: sha512-fVdCsnmYoKICsycbWuuGp6Jvi51/3G/UluFWuAUCvR8PIW5IJkAk5BM9UF8PSm0Q2IphWHFZjYEgjHsh3B9y/g==}
+    cpu: [arm64]
     os: [win32]
 
   '@types/body-parser@1.19.6':
@@ -2024,38 +2054,8 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  turbo-darwin-64@2.8.3:
-    resolution: {integrity: sha512-4kXRLfcygLOeNcP6JquqRLmGB/ATjjfehiojL2dJkL7GFm3SPSXbq7oNj8UbD8XriYQ5hPaSuz59iF1ijPHkTw==}
-    cpu: [x64]
-    os: [darwin]
-
-  turbo-darwin-arm64@2.8.3:
-    resolution: {integrity: sha512-xF7uCeC0UY0Hrv/tqax0BMbFlVP1J/aRyeGQPZT4NjvIPj8gSPDgFhfkfz06DhUwDg5NgMo04uiSkAWE8WB/QQ==}
-    cpu: [arm64]
-    os: [darwin]
-
-  turbo-linux-64@2.8.3:
-    resolution: {integrity: sha512-vxMDXwaOjweW/4etY7BxrXCSkvtwh0PbwVafyfT1Ww659SedUxd5rM3V2ZCmbwG8NiCfY7d6VtxyHx3Wh1GoZA==}
-    cpu: [x64]
-    os: [linux]
-
-  turbo-linux-arm64@2.8.3:
-    resolution: {integrity: sha512-mQX7uYBZFkuPLLlKaNe9IjR1JIef4YvY8f21xFocvttXvdPebnq3PK1Zjzl9A1zun2BEuWNUwQIL8lgvN9Pm3Q==}
-    cpu: [arm64]
-    os: [linux]
-
-  turbo-windows-64@2.8.3:
-    resolution: {integrity: sha512-YLGEfppGxZj3VWcNOVa08h6ISsVKiG85aCAWosOKNUjb6yErWEuydv6/qImRJUI+tDLvDvW7BxopAkujRnWCrw==}
-    cpu: [x64]
-    os: [win32]
-
-  turbo-windows-arm64@2.8.3:
-    resolution: {integrity: sha512-afTUGKBRmOJU1smQSBnFGcbq0iabAPwh1uXu2BVk7BREg30/1gMnJh9DFEQTah+UD3n3ru8V55J83RQNFfqoyw==}
-    cpu: [arm64]
-    os: [win32]
-
-  turbo@2.8.3:
-    resolution: {integrity: sha512-8Osxz5Tu/Dw2kb31EAY+nhq/YZ3wzmQSmYa1nIArqxgCAldxv9TPlrAiaBUDVnKA4aiPn0OFBD1ACcpc5VFOAQ==}
+  turbo@2.9.14:
+    resolution: {integrity: sha512-BQqXRr4UoWI3UPFrtznCLykYHxwxWh53iCB57x092jPMjIlW1wnm3N895g5irpiXmnxUhREBB0n6+y8BHhs4nw==}
     hasBin: true
 
   type-is@1.6.18:
@@ -2087,6 +2087,7 @@ packages:
 
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   value-or-promise@1.0.12:
@@ -2852,6 +2853,24 @@ snapshots:
     optional: true
 
   '@rollup/rollup-win32-x64-msvc@4.62.5':
+    optional: true
+
+  '@turbo/darwin-64@2.9.14':
+    optional: true
+
+  '@turbo/darwin-arm64@2.9.14':
+    optional: true
+
+  '@turbo/linux-64@2.9.14':
+    optional: true
+
+  '@turbo/linux-arm64@2.9.14':
+    optional: true
+
+  '@turbo/windows-64@2.9.14':
+    optional: true
+
+  '@turbo/windows-arm64@2.9.14':
     optional: true
 
   '@types/body-parser@1.19.6':
@@ -3853,32 +3872,14 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  turbo-darwin-64@2.8.3:
-    optional: true
-
-  turbo-darwin-arm64@2.8.3:
-    optional: true
-
-  turbo-linux-64@2.8.3:
-    optional: true
-
-  turbo-linux-arm64@2.8.3:
-    optional: true
-
-  turbo-windows-64@2.8.3:
-    optional: true
-
-  turbo-windows-arm64@2.8.3:
-    optional: true
-
-  turbo@2.8.3:
+  turbo@2.9.14:
     optionalDependencies:
-      turbo-darwin-64: 2.8.3
-      turbo-darwin-arm64: 2.8.3
-      turbo-linux-64: 2.8.3
-      turbo-linux-arm64: 2.8.3
-      turbo-windows-64: 2.8.3
-      turbo-windows-arm64: 2.8.3
+      '@turbo/darwin-64': 2.9.14
+      '@turbo/darwin-arm64': 2.9.14
+      '@turbo/linux-64': 2.9.14
+      '@turbo/linux-arm64': 2.9.14
+      '@turbo/windows-64': 2.9.14
+      '@turbo/windows-arm64': 2.9.14
 
   type-is@1.6.18:
     dependencies:
