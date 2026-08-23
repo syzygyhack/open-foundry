@@ -2,7 +2,7 @@
 # Pinned to a patch release so the baked Go stdlib stays ahead of known CVEs
 # (>=1.25.11 fixes CVE-2026-42504; >=1.25.12 the os.Root symlink flaw; >=1.25.13
 # CVE-2026-33818); bump deliberately, not via a floating tag.
-FROM golang:1.25.13-alpine AS builder
+FROM golang:1.27.0-alpine AS builder
 
 WORKDIR /app
 
