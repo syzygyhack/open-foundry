@@ -11,8 +11,12 @@ updates:
     commit-message:
       prefix: 'ci'
     groups:
+      # Minor/patch only. Grouping majors produces an unreviewable PR that mixes
+      # breaking upgrades (e.g. checkout v4 -> v7) with routine bumps; majors
+      # arrive as individual PRs so each can be assessed on its own.
       actions:
         patterns: ['*']
+        update-types: ['minor', 'patch']
 
   - package-ecosystem: npm
     directory: /
@@ -27,9 +31,11 @@ updates:
       dev-tooling:
         dependency-type: development
         patterns: ['*']
+        update-types: ['minor', 'patch']
       production:
         dependency-type: production
         patterns: ['*']
+        update-types: ['minor', 'patch']
 
   # gomod is deliberately absent. Dependabot's Go helper currently fails on this
   # module with `go_module_path_mismatch` (it misreads a "go: downloading" line
