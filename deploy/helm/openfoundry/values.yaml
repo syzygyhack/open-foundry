@@ -3,9 +3,13 @@
 
 # -- Global image settings
 image:
-  registry: openfoundry
+  # Images are published to GHCR by the release workflow.
+  registry: ghcr.io/syzygyhack/open-foundry
   pullPolicy: IfNotPresent
-  tag: "0.2"
+  # Pinned to an exact release, never a floating minor. For immutable
+  # deployments override with a digest, e.g.
+  #   --set apiGateway.image.repository=ghcr.io/.../api-gateway@sha256:<digest>
+  tag: "0.2.1"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -151,7 +155,7 @@ serviceAccount:
 apiGateway:
   replicaCount: 2
   image:
-    repository: openfoundry/api
+    repository: ghcr.io/syzygyhack/open-foundry/api-gateway
   port: 4000
   autoscaling:
     enabled: true
@@ -174,7 +178,7 @@ apiGateway:
 ontologyEngine:
   replicaCount: 2
   image:
-    repository: openfoundry/engine
+    repository: ghcr.io/syzygyhack/open-foundry/ontology-engine
   port: 4001
   autoscaling:
     enabled: false
@@ -197,7 +201,7 @@ ontologyEngine:
 actionExecutor:
   replicaCount: 2
   image:
-    repository: openfoundry/actions
+    repository: ghcr.io/syzygyhack/open-foundry/action-executor
   port: 4002
   autoscaling:
     enabled: false
@@ -220,7 +224,7 @@ actionExecutor:
 syncEngine:
   replicaCount: 1
   image:
-    repository: openfoundry/sync
+    repository: ghcr.io/syzygyhack/open-foundry/sync-engine
   port: 4003
   autoscaling:
     enabled: false
@@ -243,7 +247,7 @@ syncEngine:
 securityService:
   replicaCount: 2
   image:
-    repository: openfoundry/security
+    repository: ghcr.io/syzygyhack/open-foundry/security-service
   port: 4004
   autoscaling:
     enabled: false
@@ -266,7 +270,7 @@ securityService:
 celEvaluatorService:
   replicaCount: 1
   image:
-    repository: openfoundry/cel
+    repository: ghcr.io/syzygyhack/open-foundry/cel-evaluator
   port: 50051
   resources:
     requests:

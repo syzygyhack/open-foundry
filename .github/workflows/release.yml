@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  # Publishing container images to GHCR.
+  packages: write
   # id-token + attestations are required to publish build provenance; the
   # attestation is verifiable with `gh attestation verify`.
   id-token: write
@@ -79,6 +81,8 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -87,6 +91,60 @@ jobs:
 
       - name: Generate spec artifacts
         run: pnpm --filter @openfoundry/api spec:all
+
+      # Images and the chart are what people actually install. Without them a
+      # release is only source plus contracts, and a version-to-version upgrade
+      # cannot be tested reproducibly.
+      - name: Derive release version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push images
+        id: images
+        env:
+          POSTGRES_PASSWORD: postgres
+          KEYCLOAK_ADMIN_PASSWORD: admin
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker compose -f deploy/docker-compose.yaml build
+          registry="ghcr.io/${{ github.repository }}"
+          : > image-digests.txt
+          # compose service -> published image name
+          while read -r svc name; do
+            src="deploy-${svc}:latest"
+            dest="${registry}/${name}"
+            docker tag "$src" "${dest}:${VERSION}"
+            docker push "${dest}:${VERSION}"
+            digest=$(docker inspect --format='{{index .RepoDigests 0}}' "${dest}:${VERSION}" 2>/dev/null || true)
+            if [ -z "$digest" ]; then
+              digest="${dest}@$(docker manifest inspect "${dest}:${VERSION}" -v | jq -r '.Descriptor.digest' | head -1)"
+            fi
+            echo "$digest" >> image-digests.txt
+            echo "pushed $digest"
+          done <<'SERVICES'
+          api-gateway api-gateway
+          ontology-engine ontology-engine
+          action-executor action-executor
+          security-service security-service
+          sync-engine sync-engine
+          cel-evaluator cel-evaluator
+          SERVICES
+
+      - name: Package Helm chart at the release version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The chart must advertise exactly the version it deploys.
+          sed -i "s/^version: .*/version: ${VERSION}/; s/^appVersion: .*/appVersion: \"${VERSION}\"/" \
+            deploy/helm/openfoundry/Chart.yaml
+          sed -i "s/^  tag: \".*\"/  tag: \"${VERSION}\"/" deploy/helm/openfoundry/values.yaml
+          helm package deploy/helm/openfoundry --destination .
+          helm push "openfoundry-${VERSION}.tgz" "oci://ghcr.io/${{ github.repository }}/charts"
 
       - name: Install trivy (checksum verified)
         env:
@@ -127,6 +185,8 @@ jobs:
             packages/api/spec/schema.graphql
             packages/api/spec/asyncapi.yaml
             sbom.cyclonedx.json
+            image-digests.txt
+            openfoundry-${{ steps.ver.outputs.version }}.tgz
           )
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" "${assets[@]}" --clobber
@@ -146,6 +206,8 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
+            openfoundry-${{ steps.ver.outputs.version }}.tgz
+            image-digests.txt
             packages/api/spec/openapi.yaml
             packages/api/spec/schema.graphql
             packages/api/spec/asyncapi.yaml

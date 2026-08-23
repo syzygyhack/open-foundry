@@ -163,6 +163,30 @@ These specs are destructive (they own the Docker lifecycle and reboot the stack
 in a non-default mode on the shared ports), so they are env-gated and run in a
 dedicated `enforcement-e2e` CI job rather than the standard integration suite.
 
+## Installing a released version
+
+Releases publish container images and a versioned Helm chart, so a deployment
+does not have to build from source:
+
+```bash
+# Images: ghcr.io/syzygyhack/open-foundry/<service>:<version>
+helm install openfoundry \
+  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.2.1
+```
+
+The chart's `version` and `appVersion` always match the platform release it
+deploys, and image tags are pinned to that exact version rather than a floating
+minor. For immutable deployments, override a service with its digest — every
+release attaches `image-digests.txt` listing the digest for each image:
+
+```bash
+--set apiGateway.image.repository=ghcr.io/syzygyhack/open-foundry/api-gateway@sha256:<digest>
+```
+
+Release assets also include the OpenAPI, GraphQL and AsyncAPI contracts, a
+CycloneDX SBOM, and a build provenance attestation verifiable with
+`gh attestation verify <file> --repo syzygyhack/open-foundry`.
+
 ## Identity Provider (OIDC) Integration
 
 Production auth requires OIDC access tokens that satisfy

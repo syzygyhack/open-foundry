@@ -223,9 +223,12 @@ Semantic versioning. While pre-1.0, minor versions may contain breaking changes
 — always called out under **Breaking changes** in
 [`CHANGELOG.md`](CHANGELOG.md).
 
-**Depend on a tagged release, not `main`.** Each release attaches its OpenAPI,
-GraphQL SDL and AsyncAPI artifacts alongside the SBOM. Only the most recent
-release receives security fixes while pre-1.0.
+**Depend on a tagged release, not `main`.** Each release publishes container
+images and a versioned Helm chart to GHCR, and attaches its OpenAPI, GraphQL SDL
+and AsyncAPI contracts, a CycloneDX SBOM, per-image digests and a build
+provenance attestation. Chart and image versions always match the release, so an
+upgrade is reproducible. Only the most recent release receives security fixes
+while pre-1.0. See [installing a released version](deploy/README.md#installing-a-released-version).
 
 ---
 

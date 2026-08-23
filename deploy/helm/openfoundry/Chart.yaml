@@ -1,14 +1,19 @@
 apiVersion: v2
 name: openfoundry
-description: Open Foundry — ontology-driven clinical data platform
+description: Open Foundry — an ontology platform for operational digital twins
 type: application
-version: 0.2.0
-appVersion: "0.2.0"
+# Chart version tracks the platform release it deploys; both are set by the
+# release workflow so a chart can never advertise a version it does not deploy.
+version: 0.2.1
+appVersion: "0.2.1"
 keywords:
   - openfoundry
   - ontology
-  - clinical
-  - nhs
-home: https://github.com/syzygy/silmaril
+  - digital-twin
+  - knowledge-graph
+  - authorization
+home: https://github.com/syzygyhack/open-foundry
+sources:
+  - https://github.com/syzygyhack/open-foundry
 maintainers:
   - name: Syzygy
