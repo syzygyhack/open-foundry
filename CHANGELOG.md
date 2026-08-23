@@ -10,6 +10,8 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-23
+
 ### Security
 
 - **Migrated to Apollo Server v5.** v4 is end-of-life (26 January 2026), so the
@@ -172,7 +174,8 @@ in-memory providers, ontology engine, action framework, security layer
 (OIDC/OpenFGA/consent/audit), sync engine, GraphQL/REST/FHIR APIs, Helm chart,
 and the NHS Acute, AML, and Supply Chain domain packs.
 
-[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/syzygyhack/open-foundry/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/syzygyhack/open-foundry/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/syzygyhack/open-foundry/compare/v0.1.0-rc.3...v0.2.0
 [0.1.0-rc.3]: https://github.com/syzygyhack/open-foundry/releases/tag/v0.1.0-rc.3

@@ -9,7 +9,7 @@ image:
   # Pinned to an exact release, never a floating minor. For immutable
   # deployments override with a digest, e.g.
   #   --set apiGateway.image.repository=ghcr.io/.../api-gateway@sha256:<digest>
-  tag: "0.2.1"
+  tag: "0.2.2"
 
 imagePullSecrets: []
 nameOverride: ""
