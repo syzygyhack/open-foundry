@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest a capability or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is currently hard or impossible?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer does this affect?
+      options:
+        - ODL / schema compiler
+        - Ontology engine / storage SPI
+        - Action framework
+        - Security (authn, authz, consent, audit)
+        - API layer (GraphQL / REST / FHIR / CDM)
+        - Sync engine / connectors
+        - Deployment (Compose / Helm)
+        - Domain pack authoring
+        - Docs
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

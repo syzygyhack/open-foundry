@@ -1,0 +1,76 @@
+name: Bug report
+description: Report incorrect behaviour in the platform, a domain pack, or the deployment
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do **not** report security vulnerabilities here — use
+        [private vulnerability reporting](https://github.com/syzygyhack/open-foundry/security/advisories/new).
+
+        Note that the default `docker compose up` stack runs `NODE_ENV=development`,
+        which disables authorisation, CEL preconditions, and consent, and gives
+        unauthenticated requests a synthetic admin user. Behaviour that differs
+        between dev and production mode is usually this, not a bug — the fields
+        below help us tell the difference quickly.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you observed, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the stack with ...
+        2. POST /api/v1/actions/... with ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: node-env
+    attributes:
+      label: NODE_ENV
+      description: Development mode disables all governance enforcement.
+      options:
+        - development (default docker compose)
+        - production
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: domain-packs
+    attributes:
+      label: Loaded domain packs
+      description: The DOMAIN_PACKS value, or "unset" if all discovered packs load.
+      placeholder: "core,nhs-acute  (or: unset — all packs)"
+    validations:
+      required: true
+  - type: textarea
+    id: boot-log
+    attributes:
+      label: Gateway boot log
+      description: >
+        The api-gateway startup output
+        (`docker compose logs api-gateway | head -50`). It reports the loaded
+        packs, capabilities, seed tenant, authorization mode, and any model
+        coverage warnings — usually enough to identify the cause on its own.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release tag or commit SHA.
+      placeholder: "v0.2.0 (or a commit SHA)"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Custom domain pack, IdP in use, storage backend, related errors.

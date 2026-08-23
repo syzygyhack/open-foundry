@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/syzygyhack/open-foundry/security/advisories/new
+    about: Report privately via a GitHub security advisory — never as a public issue.
+  - name: Domain pack authoring guide
+    url: https://github.com/syzygyhack/open-foundry/blob/main/docs/external-domain-packs.md
+    about: Building your own pack — schema, actions, permissions, seeds, troubleshooting.
