@@ -21,7 +21,7 @@
   "dependencies": {
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/spi": "workspace:*",
-    "pg": "^8.13.0",
+    "pg": "^8.23.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

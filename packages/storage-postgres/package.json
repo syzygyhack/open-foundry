@@ -25,7 +25,7 @@
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/odl": "workspace:*",
     "@openfoundry/spi": "workspace:*",
-    "pg": "^8.13.0"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
