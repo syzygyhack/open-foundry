@@ -40,8 +40,8 @@ Each layer communicates only with adjacent layers through defined interfaces. No
 
 - **GraphQL API** -- Auto-generated from ODL schema via Apollo Server 4. Includes queries, mutations, subscriptions, filtering, pagination, and aggregation.
 - **REST API** -- Per-object-type read endpoints (list, get, `/links`, `/history`, `/aggregate`), governed actions via `POST /api/v1/actions/{Name}`, and object-set CRUD, all with consistent error shapes. The platform is action-oriented: objects are created and mutated through governed actions, not generic per-type create/update/delete.
-- **FHIR R4** -- Read-only Patient/Encounter endpoints with `GET /fhir/metadata` CapabilityStatement.
-- **FDP/CDM projection** -- Read-only view (REST `/api/v1/cdm/*` and GraphQL `cdmMetadata`/`cdmRecord`/`cdmRecords`/`cdmEncounters`) that maps the operational ontology to an NHS Federated Data Platform Canonical Data Model shape, with provenance preserved per record and a published gap register. Starter slice for the NHS pilot (see [`docs/cdm-mapping-profile.md`](docs/cdm-mapping-profile.md)).
+- **FHIR R4** *(opt-in)* -- Read-only Patient/Encounter endpoints with a `GET /fhir/metadata` CapabilityStatement. Mounted only when a loaded domain pack declares the `fhir` capability, so a deployment without one does not expose these routes.
+- **Common-data-model projection** *(opt-in)* -- Read-only view (REST `/api/v1/cdm/*` and GraphQL `cdmMetadata`/`cdmRecord`/`cdmRecords`/`cdmEncounters`) that maps the operational ontology onto an external canonical model, preserving per-record provenance and publishing a gap register. Gated on the `cdm` capability. The shipped profile targets the NHS Federated Data Platform (see [`docs/nhs/cdm-mapping-profile.md`](docs/nhs/cdm-mapping-profile.md)).
 - **API contract artifacts** -- OpenAPI 3.0.3, GraphQL SDL, and AsyncAPI 2.6.0 generated from the merged schema (`pnpm --filter @openfoundry/api spec:all`); OpenAPI served live at `/api/v1/openapi.json` and all three attached to tagged releases. See [`docs/api-spec.md`](docs/api-spec.md).
 - **WebSocket subscriptions** -- Real-time object change events via graphql-ws with per-connection limits (50 max).
 - **Query complexity gate** -- Rejects expensive queries before execution (depth 10, breadth 50, cost 1000).
@@ -69,7 +69,7 @@ Each layer communicates only with adjacent layers through defined interfaces. No
 
 - **OIDC authentication** -- Token validation with JWKS auto-rotation, timeout (5s), and cooldown (30s).
 - **OpenFGA ReBAC** -- Relationship-based access control with per-type and per-field permission checks.
-- **Consent management** -- Multi-tenant consent store with healthcare direct-care exemptions. PostgreSQL-backed in production, in-memory for development.
+- **Consent management** -- Multi-tenant consent store with a deployment-defined purpose vocabulary (`CONSENT_PURPOSES`) and an optional legitimate-relationship exemption, off by default. PostgreSQL-backed in production, in-memory for development.
 - **Field-level redaction** -- Sensitive fields stripped from responses based on viewer permissions.
 - **Audit trail** -- Immutable, append-only audit log for every mutation. PostgreSQL-backed in production.
 
@@ -144,7 +144,7 @@ effects → audit), with a Direct-link panel demonstrating ReBAC denial, consent
 denial, and audited success. It uses only the public action API — no SPI
 shortcuts.
 
-Stage plan and conformance boundary: [`docs/fdp-plan.md`](docs/fdp-plan.md). Production deployment, OIDC/CIS2 claims, and action-pipeline footguns: [`deploy/README.md`](deploy/README.md).
+Stage plan and conformance boundary: [`docs/nhs/fdp-plan.md`](docs/nhs/fdp-plan.md). Production deployment, OIDC/CIS2 claims, and action-pipeline footguns: [`deploy/README.md`](deploy/README.md).
 
 ---
 
@@ -382,18 +382,30 @@ production workloads.
 
 ## Documentation
 
+Start at [`docs/`](docs/) for the documentation index.
+
+**Platform**
+
 | Document | Description |
 |----------|-------------|
+| [`docs/external-domain-packs.md`](docs/external-domain-packs.md) | Building your own domain pack — schema, actions, permissions, seeds, troubleshooting |
 | [`docs/open-foundry-spec-v2.md`](docs/open-foundry-spec-v2.md) | Full technical specification |
-| [`docs/mvp-nhs-pilot.md`](docs/mvp-nhs-pilot.md) | NHS pilot design document |
-| [`docs/fdp-plan.md`](docs/fdp-plan.md) | NHS FDP integration plan, conformance boundary, stage roadmap |
-| [`docs/cdm-mapping-profile.md`](docs/cdm-mapping-profile.md) | FDP/CDM compatibility profile (S1.0) and gap register |
 | [`docs/api-spec.md`](docs/api-spec.md) | API contract artifacts (OpenAPI / GraphQL / AsyncAPI) and codegen |
-| [`docs/external-domain-packs.md`](docs/external-domain-packs.md) | Loading domain packs from outside the monorepo |
-| [`deploy/README.md`](deploy/README.md) | Deployment quickstart, production mode, OIDC/CIS2, action-pipeline footguns |
+| [`deploy/README.md`](deploy/README.md) | Deployment, development vs production mode, OIDC integration, operational footguns |
+
+**Project**
+
+| Document | Description |
+|----------|-------------|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, enforcement E2E suites, conventions |
 | [`SECURITY.md`](SECURITY.md) | Vulnerability reporting, supported versions, security posture |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history and breaking changes |
+
+**Domain verticals** — reference implementations, not part of the platform contract
+
+| Document | Description |
+|----------|-------------|
+| [`docs/nhs/`](docs/nhs/) | NHS / healthcare: pilot design, FDP integration plan, and the FDP/CDM mapping profile |
 
 ---
 

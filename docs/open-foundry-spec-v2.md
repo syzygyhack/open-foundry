@@ -2258,7 +2258,7 @@ GET /api/v1/cdm/{ResourceType}/{id}    # authenticated per-resource projection
 GET /api/v1/cdm/{ResourceType}/export  # dataset export (NDJSON | CSV)
 ```
 
-The equivalent GraphQL queries (`cdmMetadata`, `cdmRecord`, `cdmRecords`, `cdmEncounters`) are generated alongside the REST mount and gated identically — the `cdm*` fields are omitted from the generated schema when no loaded pack declares the capability. Every projected record carries a `_provenance` envelope (source type/version/timestamp plus the list of lossy fields), and reads reuse the same authorization, field-level redaction, and consent pipeline as the native API. The reference profile and gap register are documented in `docs/cdm-mapping-profile.md`. As with FHIR, a deployment whose packs do not declare `cdm` returns `404` on `/api/v1/cdm/*`.
+The equivalent GraphQL queries (`cdmMetadata`, `cdmRecord`, `cdmRecords`, `cdmEncounters`) are generated alongside the REST mount and gated identically — the `cdm*` fields are omitted from the generated schema when no loaded pack declares the capability. Every projected record carries a `_provenance` envelope (source type/version/timestamp plus the list of lossy fields), and reads reuse the same authorization, field-level redaction, and consent pipeline as the native API. The reference profile and gap register are documented in `docs/nhs/cdm-mapping-profile.md`. As with FHIR, a deployment whose packs do not declare `cdm` returns `404` on `/api/v1/cdm/*`.
 
 ### 8.4 Client SDKs
 

@@ -3,7 +3,7 @@
  *
  * Declarative mapping from the `nhs-acute` ODL ontology to an FDP/CDM-shaped
  * read view. This is the machine-readable counterpart to the human-readable
- * canonical mapping document at `docs/cdm-mapping-profile.md`.
+ * canonical mapping document at `docs/nhs/cdm-mapping-profile.md`.
  *
  * Operational subset (per plan S1.0): Patient, Ward, Bed, Admission, Discharge,
  * Transfer, Staff, Encounter. Transfer is action-only in the ODL model and

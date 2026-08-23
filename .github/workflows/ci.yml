@@ -3,7 +3,7 @@ name: CI
 # Runs the full pre-Stage-1 verification gate on every push to main and on PRs:
 # build + unit tests, Postgres integration, full Docker-stack integration,
 # helm lint, and a trivy HIGH/CRITICAL image scan. Mirrors the gates documented
-# in docs/fdp-plan.md so the posture is enforced, not just locally verified.
+# in docs/nhs/fdp-plan.md so the posture is enforced, not just locally verified.
 
 on:
   push:
