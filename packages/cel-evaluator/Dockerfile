@@ -19,21 +19,21 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /cel-evaluator .
 
 # grpc-health-probe is built from a throwaway module rather than
 # `go install pkg@version`, which would resolve the TOOL's own go.mod and bake
-# its pinned transitive deps (v0.4.53 still ships grpc 1.81.1 —
+# its pinned transitive deps (v0.4.53 still ships an older grpc —
 # GHSA-hrxh-6v49-42gf) with no way for us to override them. Inside a module we
 # can require the patched grpc explicitly; MVS then selects it for the build.
 # Keep the grpc version here in step with the one in go.mod.
 RUN mkdir -p /tools && cd /tools \
     && go mod init tools \
     && GOFLAGS=-mod=mod go get github.com/grpc-ecosystem/grpc-health-probe@v0.4.53 \
-    && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.82.1 \
+    && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.83.1 \
     && GOFLAGS=-mod=mod go get golang.org/x/text@v0.39.0 \
     && GOFLAGS=-mod=mod go get golang.org/x/net@v0.56.0 \
     && GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
 
 # Runtime stage
-FROM alpine:3.20
+FROM alpine:3.24
 
 ARG GIT_REVISION=unknown
 LABEL org.opencontainers.image.revision="${GIT_REVISION}"

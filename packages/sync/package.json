@@ -22,7 +22,7 @@
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/spi": "workspace:*",
     "pg": "^8.13.0",
-    "yaml": "^2.8.2"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.2",

@@ -28,7 +28,7 @@
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/odl": "workspace:*",
     "@openfoundry/spi": "workspace:*",
-    "yaml": "^2.8.0"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@openfoundry/storage-memory": "workspace:*",

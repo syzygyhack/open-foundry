@@ -3,7 +3,7 @@
   "version": "0.2.1",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Open Foundry \u2014 an open-source ontology platform for operational digital twins",
+  "description": "Open Foundry — an open-source ontology platform for operational digital twins",
   "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": ">=20.0.0"
@@ -18,7 +18,7 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "turbo": "^2.4.0",
+    "turbo": "^2.10.11",
     "typescript": "^5.7.0"
   },
   "pnpm": {
