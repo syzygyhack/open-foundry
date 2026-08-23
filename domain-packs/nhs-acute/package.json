@@ -13,6 +13,6 @@
     "@openfoundry/odl": "workspace:*",
     "@types/node": "^22.0.0",
     "vitest": "^3.2.7",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.3"
   }
 }
