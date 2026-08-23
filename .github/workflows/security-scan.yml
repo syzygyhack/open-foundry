@@ -1,0 +1,83 @@
+name: Scheduled security scan
+
+# Newly published CVEs affect unchanged dependencies, so image scanning drifts
+# red over time. The CI gate still blocks a PR that *introduces* a vulnerable
+# dependency; this job catches drift on its own cadence and files an issue,
+# instead of surfacing as a red build on an unrelated contributor's commit.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TRIVY_VERSION: '0.71.0'
+
+jobs:
+  scan:
+    name: Trivy image scan (HIGH/CRITICAL)
+    runs-on: ubuntu-latest
+    # Throwaway values: compose interpolates the whole file even to build, and
+    # nothing is started here.
+    env:
+      POSTGRES_PASSWORD: postgres
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all images
+        run: docker compose -f deploy/docker-compose.yaml build
+
+      - name: Install trivy (checksum verified)
+        run: |
+          set -euo pipefail
+          base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL -o "$tarball" "$base/$tarball"
+          curl -fsSL -o checksums.txt "$base/trivy_${TRIVY_VERSION}_checksums.txt"
+          grep " ${tarball}\$" checksums.txt | sha256sum -c -
+          sudo tar xz -C /usr/local/bin -f "$tarball" trivy
+
+      - name: Scan all images
+        id: scan
+        run: |
+          set -uo pipefail
+          status=0
+          : > findings.txt
+          for img in cel-evaluator api-gateway ontology-engine action-executor security-service sync-engine; do
+            echo "::group::trivy deploy-$img"
+            if ! trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 \
+                 --format table --output "scan-$img.txt" "deploy-$img:latest"; then
+              status=1
+              { echo "### deploy-$img"; echo '```'; cat "scan-$img.txt"; echo '```'; } >> findings.txt
+            fi
+            cat "scan-$img.txt" || true
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: File or update a drift issue
+        if: failure() && steps.scan.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="Security: HIGH/CRITICAL CVEs detected in container images"
+          body_file=$(mktemp)
+          {
+            echo "The scheduled scan found HIGH/CRITICAL vulnerabilities in the built images."
+            echo
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            cat findings.txt
+          } > "$body_file"
+          existing=$(gh issue list --state open --label security --search "$title in:title" \
+                      --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$body_file"
+          else
+            gh issue create --title "$title" --label security --body-file "$body_file"
+          fi

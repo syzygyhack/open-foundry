@@ -29,7 +29,7 @@ RUN mkdir -p /tools && cd /tools \
     && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.82.1 \
     && GOFLAGS=-mod=mod go get golang.org/x/text@v0.39.0 \
     && GOFLAGS=-mod=mod go get golang.org/x/net@v0.56.0 \
-    && CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
+    && GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
 
 # Runtime stage

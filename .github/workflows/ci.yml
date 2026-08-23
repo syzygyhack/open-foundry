@@ -206,10 +206,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build all images
         run: docker compose -f deploy/docker-compose.yaml build
-      - name: Install trivy
+      - name: Install trivy (checksum verified)
+        env:
+          TRIVY_VERSION: '0.71.0'
         run: |
-          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v0.71.0/trivy_0.71.0_Linux-64bit.tar.gz" \
-            | sudo tar xz -C /usr/local/bin trivy
+          set -euo pipefail
+          base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL -o "$tarball" "$base/$tarball"
+          curl -fsSL -o checksums.txt "$base/trivy_${TRIVY_VERSION}_checksums.txt"
+          grep " ${tarball}\$" checksums.txt | sha256sum -c -
+          sudo tar xz -C /usr/local/bin -f "$tarball" trivy
       - name: Scan all images (fail on HIGH/CRITICAL)
         run: |
           status=0
