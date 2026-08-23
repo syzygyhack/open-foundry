@@ -33,7 +33,7 @@ RUN mkdir -p /tools && cd /tools \
        github.com/grpc-ecosystem/grpc-health-probe
 
 # Runtime stage
-FROM alpine:3.20
+FROM alpine:3.24
 
 ARG GIT_REVISION=unknown
 LABEL org.opencontainers.image.revision="${GIT_REVISION}"
