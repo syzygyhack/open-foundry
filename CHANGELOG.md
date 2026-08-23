@@ -10,6 +10,47 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+### Security
+
+- **Migrated to Apollo Server v5.** v4 is end-of-life (26 January 2026), so the
+  GraphQL layer was running on an unsupported runtime. v5 removes the
+  `./express4` export, replaced with `@as-integrations/express4`; Express stays
+  on 4.x, which is a separate upgrade.
+
+### Added
+
+- Releases now publish **installable artifacts**: container images per service
+  and a versioned Helm chart, both to GHCR, plus an `image-digests.txt` asset so
+  deployments can pin by digest. Chart `version`/`appVersion` and the image tag
+  are set from the release tag, so a chart cannot advertise a version it does
+  not deploy.
+
+### Changed
+
+- **Releases are gated on the full CI matrix for the exact tagged commit.** The
+  previous gate ran build, typecheck, unit tests and image builds, but not the
+  Postgres integration, stack integration, enforcement E2E, Helm lint or image
+  scan — so a tag could publish from a commit where one of those had failed.
+- **Provenance is attested before a release becomes visible.** Releases are
+  created as drafts, attested, then published, so a failure never leaves a
+  public release advertising assurance it does not have.
+- Helm chart metadata corrected: it described the platform as a "clinical data
+  platform" with `clinical`/`nhs` keywords, pointed `home` at a repository that
+  does not exist, and defaulted to an unpullable `openfoundry` registry with a
+  floating `0.2` tag.
+
+### Documentation
+
+- A [tutorial](docs/first-domain-pack.md) building a complete domain pack from
+  scratch, with a runnable non-healthcare example under `examples/library-pack/`
+  and tests that keep it from drifting.
+- README rewritten around the reader (438 → ~275 lines), leading with a runnable
+  example rather than an architecture diagram.
+- Corrected three claims that were false or configuration-dependent: bootstrap
+  seeds bypass the action pipeline, `ObjectManager` writes no audit records, and
+  `@sensitive` does not redact without a field-permissions policy.
+
+
 ## [0.2.1] - 2026-08-23
 
 Patch release. The source at `v0.2.0` cannot build its container images; nothing
