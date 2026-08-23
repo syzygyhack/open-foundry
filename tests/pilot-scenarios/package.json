@@ -13,15 +13,15 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "@openfoundry/spi": "workspace:*",
-    "@openfoundry/odl": "workspace:*",
-    "@openfoundry/storage-memory": "workspace:*",
     "@openfoundry/actions": "workspace:*",
+    "@openfoundry/api": "workspace:*",
+    "@openfoundry/odl": "workspace:*",
     "@openfoundry/security": "workspace:*",
-    "@openfoundry/sync": "workspace:*",
-    "@openfoundry/api": "workspace:*"
+    "@openfoundry/spi": "workspace:*",
+    "@openfoundry/storage-memory": "workspace:*",
+    "@openfoundry/sync": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.7"
   }
 }

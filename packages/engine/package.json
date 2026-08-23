@@ -18,17 +18,19 @@
     "test": "vitest run",
     "clean": "rm -rf dist coverage"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@openfoundry/spi": "workspace:*",
+    "@openfoundry/observability": "workspace:*",
     "@openfoundry/odl": "workspace:*",
-    "@openfoundry/observability": "workspace:*"
+    "@openfoundry/spi": "workspace:*"
   },
   "devDependencies": {
     "@openfoundry/storage-memory": "workspace:*",
     "@types/node": "^22.0.0",
-    "vitest": "^3.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.7"
   }
 }

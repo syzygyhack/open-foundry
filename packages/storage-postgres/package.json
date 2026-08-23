@@ -17,7 +17,9 @@
     "test": "vitest run",
     "clean": "rm -rf dist coverage"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "Apache-2.0",
   "dependencies": {
     "@openfoundry/observability": "workspace:*",
@@ -28,6 +30,6 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.7"
   }
 }
