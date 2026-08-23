@@ -337,6 +337,24 @@ enforcement are verified on every push and pull request.
 
 ---
 
+## Versioning and Releases
+
+Open Foundry follows [Semantic Versioning](https://semver.org/). While the project
+is **pre-1.0**, minor versions may contain breaking changes — these are always
+called out under **Breaking changes** in [`CHANGELOG.md`](CHANGELOG.md).
+
+- **Depend on a tagged release, not `main`.** `main` is where development lands;
+  releases are what get changelog entries and published contract artifacts.
+- Each tagged release attaches its OpenAPI, GraphQL SDL, and AsyncAPI artifacts.
+- Only the most recent release receives security fixes while pre-1.0. See
+  [`SECURITY.md`](SECURITY.md).
+
+This is a prerelease platform: suitable for evaluation, prototyping, and
+controlled pilots, and not yet independently audited or validated for regulated
+production workloads.
+
+---
+
 ## Design Principles
 
 1. **Open source** -- Apache 2.0 licence. No proprietary dependencies.
@@ -373,6 +391,9 @@ enforcement are verified on every push and pull request.
 | [`docs/api-spec.md`](docs/api-spec.md) | API contract artifacts (OpenAPI / GraphQL / AsyncAPI) and codegen |
 | [`docs/external-domain-packs.md`](docs/external-domain-packs.md) | Loading domain packs from outside the monorepo |
 | [`deploy/README.md`](deploy/README.md) | Deployment quickstart, production mode, OIDC/CIS2, action-pipeline footguns |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, enforcement E2E suites, conventions |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting, supported versions, security posture |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history and breaking changes |
 
 ---
 
