@@ -1,0 +1,38 @@
+# Every mutation goes through an action. There is no generic object-CRUD write
+# path, which is what makes preconditions, authorization, audit and events
+# unavoidable rather than optional.
+action: BorrowBook
+version: 1
+reversible: false
+
+preconditions:
+  - expr: "book.status == 'AVAILABLE'"
+    error: "That book is not available to borrow"
+  - expr: "actor.hasRole('librarian') || actor.hasRole('admin')"
+    error: "Only librarians may lend books"
+
+effects:
+  - type: updateObject
+    target: "book"
+    set:
+      status: "ON_LOAN"
+
+  - type: createLink
+    linkType: "BorrowedBy"
+    from: "book"
+    to: "member"
+    properties:
+      borrowedAt: "now"
+      dueAt: "params.dueAt"
+
+sideEffects:
+  - name: emitBorrowedEvent
+    type: event
+    config:
+      type: "example.library.book.borrowed"
+      data:
+        bookId: "book.id"
+        memberId: "member.id"
+
+rollback:
+  onSideEffectFailure: ROLLBACK_ALL

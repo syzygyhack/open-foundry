@@ -101,6 +101,8 @@ Each layer communicates only with adjacent layers through defined interfaces. No
 
 Domain Packs are composable schema and configuration modules that specialise the platform for a particular domain.
 
+New to the platform? [**Build your first domain pack**](docs/first-domain-pack.md) walks through a complete one in about twenty minutes.
+
 | Pack | Namespace | Object Types | Actions | Connectors |
 |------|-----------|-------------|---------|------------|
 | **NHS Acute** | `nhs.acute` | Patient, Ward, Bed, Consultant, DischargeRecord, Transfer, Staff | AdmitPatient, DischargePatient, TransferWard, CleanBed, RegisterPatient | PAS (JDBC + CDC) |
@@ -388,7 +390,8 @@ Start at [`docs/`](docs/) for the documentation index.
 
 | Document | Description |
 |----------|-------------|
-| [`docs/external-domain-packs.md`](docs/external-domain-packs.md) | Building your own domain pack — schema, actions, permissions, seeds, troubleshooting |
+| [`docs/first-domain-pack.md`](docs/first-domain-pack.md) | **Tutorial** — build your first domain pack, with a worked non-healthcare example |
+| [`docs/external-domain-packs.md`](docs/external-domain-packs.md) | Domain-pack reference — connectors, capabilities, configuration, troubleshooting |
 | [`docs/open-foundry-spec-v2.md`](docs/open-foundry-spec-v2.md) | Full technical specification |
 | [`docs/api-spec.md`](docs/api-spec.md) | API contract artifacts (OpenAPI / GraphQL / AsyncAPI) and codegen |
 | [`deploy/README.md`](deploy/README.md) | Deployment, development vs production mode, OIDC integration, operational footguns |

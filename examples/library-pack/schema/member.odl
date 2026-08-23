@@ -1,0 +1,11 @@
+extend schema @namespace(name: "example.library", version: "0.1.0")
+
+type Member @objectType {
+  id: ID! @primary
+  memberNumber: String @unique @indexed
+  name: String! @indexed
+  # @sensitive fields are redacted unless the viewer's role grants them.
+  email: String @sensitive
+
+  books: [Book!]! @link(type: "BorrowedBy", direction: INBOUND)
+}

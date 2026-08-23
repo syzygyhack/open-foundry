@@ -1,0 +1,12 @@
+extend schema @namespace(name: "example.library", version: "0.1.0")
+
+type Book @objectType {
+  id: ID! @primary
+  isbn: String @unique @indexed
+  title: String! @indexed @searchable(weight: 2.0)
+  author: String!
+  status: BookStatus!
+
+  # Link fields are resolved through the link type named in the directive.
+  borrower: Member @link(type: "BorrowedBy", direction: OUTBOUND)
+}

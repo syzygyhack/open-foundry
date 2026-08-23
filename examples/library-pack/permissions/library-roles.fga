@@ -1,0 +1,24 @@
+model
+  schema 1.1
+
+type user
+
+# A pack's .fga REPLACES the whole generated block for any type it names, so
+# each type must re-declare every relation the runtime checks:
+#   - `viewer`, checked on every read (a missing one stops production boot)
+#   - the can_* relation for each action targeting the type
+type book
+  relations
+    define librarian: [user]
+    define admin: [user]
+    define viewer: [user] or librarian or admin
+    define editor: librarian or admin
+    define can_borrow: librarian or admin
+    define can_return: librarian or admin
+
+type member
+  relations
+    define librarian: [user]
+    define admin: [user]
+    define viewer: librarian or admin
+    define editor: admin

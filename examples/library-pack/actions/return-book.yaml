@@ -1,0 +1,25 @@
+action: ReturnBook
+version: 1
+reversible: false
+
+preconditions:
+  - expr: "book.status == 'ON_LOAN'"
+    error: "That book is not currently on loan"
+  - expr: "actor.hasRole('librarian') || actor.hasRole('admin')"
+    error: "Only librarians may accept returns"
+
+effects:
+  - type: updateObject
+    target: "book"
+    set:
+      status: "AVAILABLE"
+
+  - type: deleteLink
+    linkType: "BorrowedBy"
+    filter:
+      from: "book"
+      active: true
+    expect: ALL
+
+rollback:
+  onSideEffectFailure: ROLLBACK_ALL

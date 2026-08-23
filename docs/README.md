@@ -9,7 +9,8 @@ own subdirectory so it stays clearly separable.
 | Document | What it covers |
 |----------|----------------|
 | [`open-foundry-spec-v2.md`](open-foundry-spec-v2.md) | Full technical specification — ODL, storage SPI, ontology engine, actions, security, sync, APIs, federation, deployment. Reference material rather than a starting point. |
-| [`external-domain-packs.md`](external-domain-packs.md) | **Building your own domain pack** — schema, actions, permissions, seeds, configuration, and troubleshooting. Start here to model your own domain. |
+| [`first-domain-pack.md`](first-domain-pack.md) | **Tutorial — build your first domain pack.** A worked, non-healthcare example (library lending) covering object types, links, governed actions, permissions and seeds. Start here. |
+| [`external-domain-packs.md`](external-domain-packs.md) | Domain-pack reference — connectors, capabilities, configuration, and troubleshooting. Read after the tutorial. |
 | [`api-spec.md`](api-spec.md) | API contract artifacts (OpenAPI, GraphQL SDL, AsyncAPI) and client codegen. |
 
 Also useful, outside this directory:

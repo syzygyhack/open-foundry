@@ -1,0 +1,33 @@
+# A complete, minimal domain pack — the worked example for
+# docs/tutorial-first-domain-pack.md.
+#
+# Deliberately not healthcare: the platform ships no domain assumptions, and
+# this pack exercises every moving part (object types, a link type, actions with
+# preconditions and effects, a permission model, and boot seed data) without
+# touching FHIR, CDM or any clinical concept.
+name: library
+version: 0.1.0
+namespace: example.library
+description: "A small library lending domain — the tutorial's worked example"
+
+dependencies:
+  openfoundry.core: ">=1.0.0"
+
+schema:
+  - schema/enums.odl
+  - schema/book.odl
+  - schema/member.odl
+  - schema/links.odl
+  - schema/actions.odl
+
+actions:
+  - actions/borrow-book.yaml
+  - actions/return-book.yaml
+
+# Only .fga files are listed here. permissions/field-permissions.yaml is
+# discovered by convention if present.
+permissions:
+  - permissions/library-roles.fga
+
+seed:
+  - seeds/catalogue.yaml

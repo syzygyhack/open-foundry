@@ -1,0 +1,28 @@
+# Boot seeds create reference data that has no creating action. They are applied
+# idempotently under $SEED_TENANT, which defaults to the isolated `system`
+# tenant — set SEED_TENANT to your request tenant or API reads will not see them.
+objects:
+  - type: Book
+    ref: book-dune
+    fields:
+      isbn: "9780441013593"
+      title: "Dune"
+      author: "Frank Herbert"
+      status: AVAILABLE
+
+  - type: Book
+    ref: book-ubik
+    fields:
+      isbn: "9780547572291"
+      title: "Ubik"
+      author: "Philip K. Dick"
+      status: AVAILABLE
+
+  - type: Member
+    ref: member-ada
+    fields:
+      memberNumber: "M-0001"
+      name: "Ada Lovelace"
+      email: "ada@example.org"
+
+links: []

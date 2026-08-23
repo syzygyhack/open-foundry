@@ -1,0 +1,8 @@
+extend schema @namespace(name: "example.library", version: "0.1.0")
+
+# A link type is a first-class object: it can carry its own properties.
+type BorrowedBy @linkType(from: "Book", to: "Member", cardinality: MANY_TO_ONE) {
+  id: ID! @primary
+  borrowedAt: DateTime!
+  dueAt: DateTime
+}

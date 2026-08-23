@@ -1,5 +1,9 @@
 # External Domain Packs
 
+> Building a pack for the first time? Start with the
+> [tutorial](first-domain-pack.md), which walks through a complete worked
+> example. This document is the reference.
+
 Load domain packs from outside the Open Foundry monorepo — for proprietary schemas,
 partner integrations, or tenant-specific ontologies that live in separate repositories.
 

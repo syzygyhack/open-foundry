@@ -1,0 +1,13 @@
+extend schema @namespace(name: "example.library", version: "0.1.0")
+
+# @param marks an action input. The first parameter whose type is an ObjectType
+# is the authorization target — the object the can_* permission is checked on.
+type BorrowBook @actionType(permission: "can_borrow") {
+  book: Book! @param
+  member: Member! @param
+  dueAt: DateTime @param
+}
+
+type ReturnBook @actionType(permission: "can_return") {
+  book: Book! @param
+}

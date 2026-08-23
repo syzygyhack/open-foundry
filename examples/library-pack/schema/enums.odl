@@ -1,0 +1,7 @@
+extend schema @namespace(name: "example.library", version: "0.1.0")
+
+enum BookStatus {
+  AVAILABLE
+  ON_LOAN
+  WITHDRAWN
+}
