@@ -224,7 +224,7 @@ The monorepo contains 20 packages across four workspace roots:
 - Node.js >= 20.0.0
 - pnpm 9.15+
 - Docker & Docker Compose (for integration tests and local deployment)
-- Go 1.24+ (only when building `packages/cel-evaluator` outside Docker)
+- Go 1.25+ (only when building `packages/cel-evaluator` outside Docker)
 
 ### Install and Build
 
@@ -256,6 +256,18 @@ docker compose up -d
 ```
 
 This starts PostgreSQL+AGE, Redpanda (Kafka), Redis, Debezium CDC, Keycloak (OIDC), OpenFGA (ReBAC), OpenTelemetry Collector, and all Open Foundry services. See [`deploy/README.md`](deploy/README.md) for the full service table.
+
+> [!IMPORTANT]
+> **The default stack runs with governance enforcement disabled.** The shipped
+> Compose file sets `NODE_ENV=development`, which replaces OpenFGA and CEL with
+> allow-all stubs and gives unauthenticated requests a synthetic admin user with
+> every role. It exists for fast local iteration — it is **not** a secured
+> deployment, and must never be exposed to an untrusted network.
+>
+> Nothing you observe in this mode demonstrates ReBAC, CEL preconditions,
+> consent, or field redaction actually working. To exercise real enforcement, run
+> in production mode — see
+> [Development Mode vs Production Mode](deploy/README.md#development-mode-vs-production-mode).
 
 ### Try the API
 
@@ -382,18 +394,6 @@ A human engineer took over direction -- reviewing the codebase, revising the spe
 - **Security hardening** -- Multiple review rounds (including cross-model Codex reviews) identified and fixed 200+ issues across auth pipelines, SQL injection, field-level redaction, system-field mapping, error message sanitization, CORS fail-closed, proxy-aware rate limiting, advisory lock safety, and schema migration integrity.
 - **Production hardening** -- Structured logging, query complexity gates, idempotency caching, connection timeouts, graceful shutdown, non-root containers, Helm PDBs, and network policies.
 - **Postgres integration** -- Idempotent DDL generation (AGE graph/labels), link table schema alignment, traversal behavior parity with the memory provider, and an integration suite against a live PostgreSQL+AGE instance.
-
-### By the Numbers
-
-| Metric | Value |
-|--------|-------|
-| TypeScript source | ~27,600 lines |
-| Test code | ~33,000 lines |
-| Go source (CEL evaluator) | ~2,100 lines |
-| Domain pack config (ODL, YAML, FGA) | ~1,700 lines |
-| Deployment config | ~2,200 lines |
-| Specification + docs | ~4,200 lines |
-| Packages | 20 |
 
 ---
 

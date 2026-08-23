@@ -75,8 +75,14 @@ app services (and satisfy the production requirements below).
 In production the FGA client is only wired when `OPENFGA_STORE_ID` is non-empty
 **at boot**. `init-services.sh` creates the store and writes that ID, but a plain
 `docker compose up -d` starts api-gateway *before* the init script runs — so the
-gateway boots without a store ID and silently falls back to the allow-all FGA stub
-even in production mode.
+gateway would boot without a store ID.
+
+It **fails closed**: `OPENFGA_STORE_ID` is one of the `REQUIRED_PROD_VARS`
+(`packages/api/src/config.ts`), so with `NODE_ENV=production` the gateway logs
+`FATAL: Production mode requires env vars: …` and exits rather than starting
+without authorization. A production gateway therefore never silently degrades to
+the allow-all stub — but it will crash-loop until the store ID is supplied, so the
+ordering below still matters.
 
 **Correct production order:**
 
