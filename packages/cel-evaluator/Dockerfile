@@ -39,7 +39,14 @@ ARG GIT_REVISION=unknown
 LABEL org.opencontainers.image.revision="${GIT_REVISION}"
 ENV GIT_REVISION="${GIT_REVISION}"
 
-RUN apk --no-cache add ca-certificates \
+# `apk upgrade` before installing: the alpine:3.24 tag is only rebuilt
+# periodically, so a base-image CVE stays present until it is. Upgrading against
+# the current package index closes that window at build time — this is how
+# CVE-2026-14456 (openssl DoS, libcrypto3/libssl3 3.5.7-r0 -> 3.5.8-r0) reached
+# the runtime image. The node-based service images are unaffected; only this one
+# uses a bare alpine base.
+RUN apk --no-cache upgrade \
+    && apk --no-cache add ca-certificates \
     && adduser -D -u 1000 cel
 
 COPY --from=builder /usr/local/bin/grpc-health-probe /usr/local/bin/grpc-health-probe

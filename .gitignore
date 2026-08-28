@@ -62,3 +62,5 @@ yarn.lock
 *.tar.gz
 .cardinal/
 .avril/
+# Local agent guidance (not part of the published project)
+AGENTS.md
