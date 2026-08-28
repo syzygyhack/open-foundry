@@ -4,8 +4,8 @@ description: Open Foundry — an ontology platform for operational digital twins
 type: application
 # Chart version tracks the platform release it deploys; both are set by the
 # release workflow so a chart can never advertise a version it does not deploy.
-version: 0.2.2
-appVersion: "0.2.2"
+version: 0.2.3
+appVersion: "0.2.3"
 keywords:
   - openfoundry
   - ontology

@@ -10,6 +10,24 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-28
+
+### Security
+
+- **Cleared CVE-2026-14456** (openssl denial of service via unbounded memory,
+  HIGH) from the `cel-evaluator` image. `libcrypto3`/`libssl3` moved from
+  3.5.7-r0 to 3.5.8-r0. Only this image was affected — it is the one built on a
+  bare alpine base, while the other services use `node:20-alpine`.
+
+  Bumping the alpine tag would not have fixed it: the `alpine:3.24` image
+  itself still ships the vulnerable packages, because the fix is a package
+  update rather than an alpine release and the tag is only rebuilt periodically.
+  The runtime stage now upgrades against the current package index at build time,
+  so the window between an upstream fix and a base-image rebuild is closed.
+
+  **Anyone running `cel-evaluator:0.2.2` should upgrade** — that published
+  image carries the vulnerable openssl.
+
 ## [0.2.2] - 2026-08-23
 
 ### Security
@@ -174,7 +192,8 @@ in-memory providers, ontology engine, action framework, security layer
 (OIDC/OpenFGA/consent/audit), sync engine, GraphQL/REST/FHIR APIs, Helm chart,
 and the NHS Acute, AML, and Supply Chain domain packs.
 
-[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/syzygyhack/open-foundry/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/syzygyhack/open-foundry/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/syzygyhack/open-foundry/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/syzygyhack/open-foundry/compare/v0.1.0-rc.3...v0.2.0
