@@ -26,7 +26,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "commander": "^14.0.3",
-    "graphql": "^16.10.0"
+    "graphql": "^17.0.2"
   },
   "devDependencies": {
     "@openfoundry/spi": "workspace:*",
