@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "turbo": "^2.10.11",
-    "typescript": "^5.7.0"
+    "typescript": "^7.0.2"
   },
   "pnpm": {
     "overrides": {
