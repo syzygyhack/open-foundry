@@ -30,6 +30,6 @@
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "^2.11.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.0"
   }
 }
