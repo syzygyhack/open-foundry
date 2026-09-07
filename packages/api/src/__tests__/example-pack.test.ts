@@ -54,11 +54,12 @@ describe('examples/library-pack (tutorial worked example)', () => {
     const member = fieldPermissions.find(c => c.objectType === 'Member');
     expect(member).toBeDefined();
     // Redaction only engages for types listed here, and once a type is listed
-    // every field is hidden unless allowed — including link fields, which is the
-    // subtlety the tutorial calls out.
+    // every stored field is hidden unless allowed. Virtual link fields are
+    // authorized when their resolvers traverse to target objects.
     expect(member!.alwaysVisible).toEqual(
-      expect.arrayContaining(['id', 'memberNumber', 'name', 'books']),
+      expect.arrayContaining(['id', 'memberNumber', 'name']),
     );
+    expect(member!.alwaysVisible).not.toContain('books');
     expect(member!.fieldsByRelation['librarian']).toContain('email');
     expect(member!.alwaysVisible).not.toContain('email');
   });
