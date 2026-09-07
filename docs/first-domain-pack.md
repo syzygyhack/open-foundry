@@ -270,7 +270,6 @@ takes `.fga` files.
     - id
     - memberNumber
     - name
-    - books
   fieldsByRelation:
     librarian:
       - email
@@ -280,9 +279,13 @@ takes `.fga` files.
 
 This is the part that catches people: **marking a field `@sensitive` protects
 nothing by itself.** Redaction only engages for object types that appear in this
-file. Once a type does appear, the rule inverts — every field is hidden unless
-it is in `alwaysVisible` or granted to one of the caller's roles, and that
-includes link fields like `books`, which is why it is listed above.
+file. Once a type does appear, the rule inverts — every stored field is hidden
+unless it is in `alwaysVisible` or granted to one of the caller's roles.
+
+Virtual `@link` fields such as `books` are not stored object fields and do not
+belong in this file. Link traversal independently checks whether the caller can
+view each target object, then applies that target type's own field-redaction
+rules.
 
 Responses carry a `_redactedFields` array naming what was withheld.
 

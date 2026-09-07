@@ -548,7 +548,7 @@ function validateFieldPermissions(
       continue;
     }
 
-    // Collect stored field names (excluding @link, @computed, @primary)
+    // Collect stored fields eligible for object-field redaction.
     const storedFields = new Set<string>();
     for (const field of objType.fields) {
       if (field.directives.some(d => d.kind === 'primary')) {
@@ -563,7 +563,7 @@ function validateFieldPermissions(
     for (const f of config.alwaysVisible) {
       if (f !== 'id' && !storedFields.has(f)) {
         logger.warn(
-          `Field permissions [${config.objectType}]: alwaysVisible field "${f}" not in schema. ` +
+          `Field permissions [${config.objectType}]: alwaysVisible field "${f}" is not a stored field eligible for redaction. ` +
           `Valid: ${[...storedFields].join(', ')}`,
         );
       }
@@ -574,7 +574,7 @@ function validateFieldPermissions(
       for (const f of fields) {
         if (!storedFields.has(f)) {
           logger.warn(
-            `Field permissions [${config.objectType}].${relation}: field "${f}" not in schema. ` +
+            `Field permissions [${config.objectType}].${relation}: field "${f}" is not a stored field eligible for redaction. ` +
             `Valid: ${[...storedFields].join(', ')}`,
           );
         }

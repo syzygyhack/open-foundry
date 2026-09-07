@@ -20,6 +20,11 @@ are called out under **Breaking changes**.
 - Updated the CEL service and its health probe to gRPC-Go 1.83.2 so requests
   missing both authority headers are rejected rather than accepted.
 
+### Fixed
+
+- Corrected the domain-pack tutorial's field-redaction guidance: virtual link
+  fields are authorized during traversal rather than configured as stored fields.
+
 ### Changed
 
 - Migrated the API gateway and Apollo middleware to Express 5, including the
