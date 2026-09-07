@@ -22,7 +22,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Keep major-version reviews from filling the queue and starving the
+    # grouped routine updates that Dependabot evaluates separately.
+    open-pull-requests-limit: 10
     commit-message:
       prefix: 'chore(deps)'
     groups:
