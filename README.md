@@ -94,6 +94,9 @@ That example is real and runnable: it is
 
 ### Run the stack
 
+Running the container stack requires Docker with Compose v2. Working from the
+source tree also requires Node.js 24 or newer and pnpm 9.15 or newer.
+
 ```bash
 cd deploy
 cp .env.example .env          # set POSTGRES_PASSWORD and KEYCLOAK_ADMIN_PASSWORD
