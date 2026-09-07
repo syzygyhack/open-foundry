@@ -27,7 +27,7 @@ export function generateUUIDv7(): string {
   }
 
   // 10 bytes of cryptographic randomness
-  // Node.js 20+ always has globalThis.crypto.getRandomValues (Web Crypto API)
+  // Node.js 24+ always has globalThis.crypto.getRandomValues (Web Crypto API)
   const randBytes = new Uint8Array(10);
   if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues) {
     globalThis.crypto.getRandomValues(randBytes);

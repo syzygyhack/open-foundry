@@ -1,7 +1,7 @@
 /**
  * HTTP and GraphQL client helpers for integration tests.
  *
- * Uses native fetch (Node 20+). Provides typed wrappers for:
+ * Uses native fetch (Node 24+). Provides typed wrappers for:
  * - GraphQL queries/mutations via POST
  * - REST API calls (GET, POST, PUT, DELETE)
  * - FHIR resource reads

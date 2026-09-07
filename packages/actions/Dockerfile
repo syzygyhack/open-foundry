@@ -1,5 +1,5 @@
 # Action Executor — CEL evaluation and action execution pipeline
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
@@ -14,7 +14,7 @@ COPY tools/ tools/
 RUN pnpm install --frozen-lockfile
 RUN pnpm turbo build --filter=@openfoundry/actions...
 
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Apply OS security patches newer than the pinned base digest
 # (openssl libcrypto3/libssl3 CVE-2026-45447, fixed in 3.5.7-r0).
