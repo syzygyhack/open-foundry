@@ -1,0 +1,1277 @@
+asyncapi: 2.6.0
+info:
+  title: Open Foundry Event API
+  version: 0.2.4
+  description: Real-time change events for the Open Foundry ontology platform.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  websocket:
+    url: /graphql
+    protocol: ws
+    description: GraphQL WebSocket transport (graphql-ws protocol)
+    security:
+      - bearerAuth: []
+channels:
+  customerChanged:
+    description: Changes to a specific Customer object (by ID).
+    subscribe:
+      operationId: onCustomerChanged
+      summary: Receive change events for a single Customer
+      message:
+        name: CustomerChangeEvent
+        payload: &a1
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Customer object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Customer
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Customer to watch
+        schema:
+          type: string
+          format: uuid
+  customersChanged:
+    description: Changes to any Customer object (optionally filtered).
+    subscribe:
+      operationId: onCustomersChanged
+      summary: Receive change events for Customer objects
+      message:
+        name: CustomerChangeEvent
+        payload: *a1
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  accountChanged:
+    description: Changes to a specific Account object (by ID).
+    subscribe:
+      operationId: onAccountChanged
+      summary: Receive change events for a single Account
+      message:
+        name: AccountChangeEvent
+        payload: &a2
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Account object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Account
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Account to watch
+        schema:
+          type: string
+          format: uuid
+  accountsChanged:
+    description: Changes to any Account object (optionally filtered).
+    subscribe:
+      operationId: onAccountsChanged
+      summary: Receive change events for Account objects
+      message:
+        name: AccountChangeEvent
+        payload: *a2
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  transactionChanged:
+    description: Changes to a specific Transaction object (by ID).
+    subscribe:
+      operationId: onTransactionChanged
+      summary: Receive change events for a single Transaction
+      message:
+        name: TransactionChangeEvent
+        payload: &a3
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Transaction object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Transaction
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Transaction to watch
+        schema:
+          type: string
+          format: uuid
+  transactionsChanged:
+    description: Changes to any Transaction object (optionally filtered).
+    subscribe:
+      operationId: onTransactionsChanged
+      summary: Receive change events for Transaction objects
+      message:
+        name: TransactionChangeEvent
+        payload: *a3
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  alertChanged:
+    description: Changes to a specific Alert object (by ID).
+    subscribe:
+      operationId: onAlertChanged
+      summary: Receive change events for a single Alert
+      message:
+        name: AlertChangeEvent
+        payload: &a4
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Alert object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Alert
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Alert to watch
+        schema:
+          type: string
+          format: uuid
+  alertsChanged:
+    description: Changes to any Alert object (optionally filtered).
+    subscribe:
+      operationId: onAlertsChanged
+      summary: Receive change events for Alert objects
+      message:
+        name: AlertChangeEvent
+        payload: *a4
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  caseChanged:
+    description: Changes to a specific Case object (by ID).
+    subscribe:
+      operationId: onCaseChanged
+      summary: Receive change events for a single Case
+      message:
+        name: CaseChangeEvent
+        payload: &a5
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Case object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Case
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Case to watch
+        schema:
+          type: string
+          format: uuid
+  casesChanged:
+    description: Changes to any Case object (optionally filtered).
+    subscribe:
+      operationId: onCasesChanged
+      summary: Receive change events for Case objects
+      message:
+        name: CaseChangeEvent
+        payload: *a5
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  suspiciousActivityReportChanged:
+    description: Changes to a specific SuspiciousActivityReport object (by ID).
+    subscribe:
+      operationId: onSuspiciousActivityReportChanged
+      summary: Receive change events for a single SuspiciousActivityReport
+      message:
+        name: SuspiciousActivityReportChangeEvent
+        payload: &a6
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: SuspiciousActivityReport object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: SuspiciousActivityReport
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the SuspiciousActivityReport to watch
+        schema:
+          type: string
+          format: uuid
+  suspiciousActivityReportsChanged:
+    description: Changes to any SuspiciousActivityReport object (optionally filtered).
+    subscribe:
+      operationId: onSuspiciousActivityReportsChanged
+      summary: Receive change events for SuspiciousActivityReport objects
+      message:
+        name: SuspiciousActivityReportChangeEvent
+        payload: *a6
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  patientChanged:
+    description: Changes to a specific Patient object (by ID).
+    subscribe:
+      operationId: onPatientChanged
+      summary: Receive change events for a single Patient
+      message:
+        name: PatientChangeEvent
+        payload: &a7
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Patient object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Patient
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Patient to watch
+        schema:
+          type: string
+          format: uuid
+  patientsChanged:
+    description: Changes to any Patient object (optionally filtered).
+    subscribe:
+      operationId: onPatientsChanged
+      summary: Receive change events for Patient objects
+      message:
+        name: PatientChangeEvent
+        payload: *a7
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  wardChanged:
+    description: Changes to a specific Ward object (by ID).
+    subscribe:
+      operationId: onWardChanged
+      summary: Receive change events for a single Ward
+      message:
+        name: WardChangeEvent
+        payload: &a8
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Ward object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Ward
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Ward to watch
+        schema:
+          type: string
+          format: uuid
+  wardsChanged:
+    description: Changes to any Ward object (optionally filtered).
+    subscribe:
+      operationId: onWardsChanged
+      summary: Receive change events for Ward objects
+      message:
+        name: WardChangeEvent
+        payload: *a8
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  bedChanged:
+    description: Changes to a specific Bed object (by ID).
+    subscribe:
+      operationId: onBedChanged
+      summary: Receive change events for a single Bed
+      message:
+        name: BedChangeEvent
+        payload: &a9
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Bed object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Bed
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Bed to watch
+        schema:
+          type: string
+          format: uuid
+  bedsChanged:
+    description: Changes to any Bed object (optionally filtered).
+    subscribe:
+      operationId: onBedsChanged
+      summary: Receive change events for Bed objects
+      message:
+        name: BedChangeEvent
+        payload: *a9
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  consultantChanged:
+    description: Changes to a specific Consultant object (by ID).
+    subscribe:
+      operationId: onConsultantChanged
+      summary: Receive change events for a single Consultant
+      message:
+        name: ConsultantChangeEvent
+        payload: &a10
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Consultant object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Consultant
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Consultant to watch
+        schema:
+          type: string
+          format: uuid
+  consultantsChanged:
+    description: Changes to any Consultant object (optionally filtered).
+    subscribe:
+      operationId: onConsultantsChanged
+      summary: Receive change events for Consultant objects
+      message:
+        name: ConsultantChangeEvent
+        payload: *a10
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  staffChanged:
+    description: Changes to a specific Staff object (by ID).
+    subscribe:
+      operationId: onStaffChanged
+      summary: Receive change events for a single Staff
+      message:
+        name: StaffChangeEvent
+        payload: &a11
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Staff object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Staff
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Staff to watch
+        schema:
+          type: string
+          format: uuid
+  staffsChanged:
+    description: Changes to any Staff object (optionally filtered).
+    subscribe:
+      operationId: onStaffsChanged
+      summary: Receive change events for Staff objects
+      message:
+        name: StaffChangeEvent
+        payload: *a11
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  dischargeRecordChanged:
+    description: Changes to a specific DischargeRecord object (by ID).
+    subscribe:
+      operationId: onDischargeRecordChanged
+      summary: Receive change events for a single DischargeRecord
+      message:
+        name: DischargeRecordChangeEvent
+        payload: &a12
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: DischargeRecord object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: DischargeRecord
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the DischargeRecord to watch
+        schema:
+          type: string
+          format: uuid
+  dischargeRecordsChanged:
+    description: Changes to any DischargeRecord object (optionally filtered).
+    subscribe:
+      operationId: onDischargeRecordsChanged
+      summary: Receive change events for DischargeRecord objects
+      message:
+        name: DischargeRecordChangeEvent
+        payload: *a12
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  transferChanged:
+    description: Changes to a specific Transfer object (by ID).
+    subscribe:
+      operationId: onTransferChanged
+      summary: Receive change events for a single Transfer
+      message:
+        name: TransferChangeEvent
+        payload: &a13
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Transfer object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Transfer
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Transfer to watch
+        schema:
+          type: string
+          format: uuid
+  transfersChanged:
+    description: Changes to any Transfer object (optionally filtered).
+    subscribe:
+      operationId: onTransfersChanged
+      summary: Receive change events for Transfer objects
+      message:
+        name: TransferChangeEvent
+        payload: *a13
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  supplierChanged:
+    description: Changes to a specific Supplier object (by ID).
+    subscribe:
+      operationId: onSupplierChanged
+      summary: Receive change events for a single Supplier
+      message:
+        name: SupplierChangeEvent
+        payload: &a14
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Supplier object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Supplier
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Supplier to watch
+        schema:
+          type: string
+          format: uuid
+  suppliersChanged:
+    description: Changes to any Supplier object (optionally filtered).
+    subscribe:
+      operationId: onSuppliersChanged
+      summary: Receive change events for Supplier objects
+      message:
+        name: SupplierChangeEvent
+        payload: *a14
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  facilityChanged:
+    description: Changes to a specific Facility object (by ID).
+    subscribe:
+      operationId: onFacilityChanged
+      summary: Receive change events for a single Facility
+      message:
+        name: FacilityChangeEvent
+        payload: &a15
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Facility object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Facility
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Facility to watch
+        schema:
+          type: string
+          format: uuid
+  facilitysChanged:
+    description: Changes to any Facility object (optionally filtered).
+    subscribe:
+      operationId: onFacilitysChanged
+      summary: Receive change events for Facility objects
+      message:
+        name: FacilityChangeEvent
+        payload: *a15
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  productChanged:
+    description: Changes to a specific Product object (by ID).
+    subscribe:
+      operationId: onProductChanged
+      summary: Receive change events for a single Product
+      message:
+        name: ProductChangeEvent
+        payload: &a16
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Product object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Product
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Product to watch
+        schema:
+          type: string
+          format: uuid
+  productsChanged:
+    description: Changes to any Product object (optionally filtered).
+    subscribe:
+      operationId: onProductsChanged
+      summary: Receive change events for Product objects
+      message:
+        name: ProductChangeEvent
+        payload: *a16
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  purchaseOrderChanged:
+    description: Changes to a specific PurchaseOrder object (by ID).
+    subscribe:
+      operationId: onPurchaseOrderChanged
+      summary: Receive change events for a single PurchaseOrder
+      message:
+        name: PurchaseOrderChangeEvent
+        payload: &a17
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: PurchaseOrder object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: PurchaseOrder
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the PurchaseOrder to watch
+        schema:
+          type: string
+          format: uuid
+  purchaseOrdersChanged:
+    description: Changes to any PurchaseOrder object (optionally filtered).
+    subscribe:
+      operationId: onPurchaseOrdersChanged
+      summary: Receive change events for PurchaseOrder objects
+      message:
+        name: PurchaseOrderChangeEvent
+        payload: *a17
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  shipmentChanged:
+    description: Changes to a specific Shipment object (by ID).
+    subscribe:
+      operationId: onShipmentChanged
+      summary: Receive change events for a single Shipment
+      message:
+        name: ShipmentChangeEvent
+        payload: &a18
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: Shipment object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: Shipment
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the Shipment to watch
+        schema:
+          type: string
+          format: uuid
+  shipmentsChanged:
+    description: Changes to any Shipment object (optionally filtered).
+    subscribe:
+      operationId: onShipmentsChanged
+      summary: Receive change events for Shipment objects
+      message:
+        name: ShipmentChangeEvent
+        payload: *a18
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+  inventoryRecordChanged:
+    description: Changes to a specific InventoryRecord object (by ID).
+    subscribe:
+      operationId: onInventoryRecordChanged
+      summary: Receive change events for a single InventoryRecord
+      message:
+        name: InventoryRecordChangeEvent
+        payload: &a19
+          type: object
+          properties:
+            changeType:
+              type: string
+              enum:
+                - CREATED
+                - UPDATED
+                - DELETED
+            object:
+              type: object
+              description: InventoryRecord object snapshot after the change.
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                _type:
+                  type: string
+                  const: InventoryRecord
+            previousValues:
+              type: object
+              nullable: true
+              description: Field-level diff (old/new) for UPDATED events.
+            causedBy:
+              type: object
+              nullable: true
+              properties:
+                actionType:
+                  type: string
+                  nullable: true
+                actionId:
+                  type: string
+                  nullable: true
+            timestamp:
+              type: string
+              format: date-time
+          required:
+            - changeType
+            - object
+            - timestamp
+    parameters:
+      id:
+        description: ID of the InventoryRecord to watch
+        schema:
+          type: string
+          format: uuid
+  inventoryRecordsChanged:
+    description: Changes to any InventoryRecord object (optionally filtered).
+    subscribe:
+      operationId: onInventoryRecordsChanged
+      summary: Receive change events for InventoryRecord objects
+      message:
+        name: InventoryRecordChangeEvent
+        payload: *a19
+    parameters:
+      filter:
+        description: Optional JSON filter to narrow the subscription
+        schema:
+          type: object
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Pass via connection_params.Authorization when establishing the WebSocket connection.
