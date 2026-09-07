@@ -98,6 +98,20 @@ docker compose up -d postgresql openfga keycloak redis redpanda
 docker compose up -d api-gateway
 ```
 
+### Redis rate limiting fails open while unavailable
+
+When `REDIS_URL` is set, the gateway uses Redis for distributed rate limiting.
+The client deliberately disables its offline command queue and uses short
+timeouts because rate limiting is a quality-of-service control, not an access
+control boundary. Requests that arrive during the initial Redis connection,
+while Redis is reconnecting, or during an outage are therefore allowed rather
+than delayed or rejected. Each affected request emits a
+`RedisRateLimiter Redis error, failing open` warning.
+
+Monitor that warning and Redis availability if distributed limits are an
+operational requirement. Authorization and other security controls do not rely
+on this fail-open path.
+
 ### Schema-checksum drift on re-deploy with persisted volumes
 
 Re-deploying after a domain-pack DDL change against an **existing** PostgreSQL

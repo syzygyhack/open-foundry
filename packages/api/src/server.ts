@@ -132,10 +132,12 @@ async function main(): Promise<void> {
   let redisClient: import('ioredis').Redis | undefined;
   const redisUrl = process.env['REDIS_URL'];
   if (redisUrl) {
-    // Dynamic import for optional dependency — cast needed for CJS/ESM interop
-    const ioredis = await import('ioredis');
-    const RedisClient = ioredis.default as unknown as new (url: string, opts: Record<string, unknown>) => import('ioredis').Redis;
+    // Dynamic import keeps Redis optional when distributed limiting is disabled.
+    const { Redis: RedisClient } = await import('ioredis');
     redisClient = new RedisClient(redisUrl, {
+      // The limiter uses no RESP3 features; retain v5 wire compatibility for
+      // Redis-compatible proxies while taking the v6 client fixes.
+      protocol: 2,
       // Fail fast: rate limiting is QoS, not a security boundary.
       // Default ioredis retries 20 times with offline queue, stalling requests for seconds.
       maxRetriesPerRequest: 1,
