@@ -22,7 +22,7 @@
     "@openfga/sdk": "^0.9.7",
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/spi": "workspace:*",
-    "jose": "^6.2.10"
+    "jose": "^6.2.12"
   },
   "license": "Apache-2.0",
   "devDependencies": {
