@@ -347,7 +347,7 @@ describe('SubscriptionManager', () => {
 
     // Subscribe to the PubSub topic
     const received: unknown[] = [];
-    const iterator = pubsub.asyncIterator('patientChanged');
+    const iterator = pubsub.asyncIterableIterator('patientChanged');
 
     // Set up listener
     const listenPromise = iterator.next().then((result) => {

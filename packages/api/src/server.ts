@@ -26,7 +26,7 @@
 
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
-import { useServer } from 'graphql-ws/lib/use/ws';
+import { useServer } from 'graphql-ws/use/ws';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
