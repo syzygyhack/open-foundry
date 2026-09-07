@@ -26,6 +26,12 @@ updates:
     commit-message:
       prefix: 'chore(deps)'
     groups:
+      # Stable 2.x and experimental 0.x packages are released together and
+      # cross dependency types. Match them before the generic groups so tests
+      # exercise the same SDK family used at runtime.
+      opentelemetry:
+        patterns: ['@opentelemetry/*']
+        update-types: ['minor', 'patch']
       # One PR per ecosystem area keeps the review load sane in a 19-package
       # workspace; security updates still arrive individually and immediately.
       dev-tooling:
