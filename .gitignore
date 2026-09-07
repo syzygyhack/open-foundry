@@ -47,9 +47,6 @@ Thumbs.db
 # Generated SDK output
 packages/sdk-typescript/generated/
 
-# Generated spec output (rebuilt via spec:all)
-packages/api/spec/
-
 # Docker volumes (local dev)
 deploy/docker-volumes/
 

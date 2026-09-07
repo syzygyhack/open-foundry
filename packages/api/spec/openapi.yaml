@@ -1,0 +1,6321 @@
+openapi: 3.0.3
+info:
+  title: Open Foundry API
+  version: 0.2.4
+  description: Auto-generated REST API for the Open Foundry ontology platform.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: /
+    description: Current server
+paths:
+  /api/v1/customers:
+    get:
+      tags:
+        - Customer
+      summary: List Customer objects
+      operationId: listCustomers
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[externalId]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by externalId
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[type]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by type
+        - name: filter[riskLevel]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by riskLevel
+        - name: filter[kycStatus]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by kycStatus
+        - name: filter[kycExpiryDate]
+          in: query
+          schema:
+            type: string
+            format: date
+            nullable: true
+          description: Filter by kycExpiryDate
+        - name: filter[country]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by country
+        - name: filter[dateOfBirth]
+          in: query
+          schema:
+            type: string
+            format: date
+            nullable: true
+          description: Filter by dateOfBirth
+        - name: filter[taxId]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by taxId
+      responses:
+        "200":
+          description: List of Customer objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Customer"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/customers/aggregate:
+    get:
+      tags:
+        - Customer
+      summary: Aggregate Customer objects
+      operationId: aggregateCustomers
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/customers/search:
+    get:
+      tags:
+        - Customer
+      summary: Full-text search Customer objects
+      operationId: searchCustomers
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Customer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/customers/{id}:
+    get:
+      tags:
+        - Customer
+      summary: Get Customer by ID
+      operationId: getCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Customer object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Customer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/customers/{id}/links/{linkType}:
+    get:
+      tags:
+        - Customer
+      summary: Get linked objects from Customer
+      operationId: getCustomerLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/customers/{id}/history:
+    get:
+      tags:
+        - Customer
+      summary: Get version history of Customer
+      operationId: getCustomerHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/accounts:
+    get:
+      tags:
+        - Account
+      summary: List Account objects
+      operationId: listAccounts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[accountNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by accountNumber
+        - name: filter[type]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by type
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[currency]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by currency
+        - name: filter[customer]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by customer
+        - name: filter[openDate]
+          in: query
+          schema:
+            type: string
+            format: date
+            nullable: true
+          description: Filter by openDate
+        - name: filter[lastActivityDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by lastActivityDate
+      responses:
+        "200":
+          description: List of Account objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Account"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/accounts/aggregate:
+    get:
+      tags:
+        - Account
+      summary: Aggregate Account objects
+      operationId: aggregateAccounts
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/accounts/search:
+    get:
+      tags:
+        - Account
+      summary: Full-text search Account objects
+      operationId: searchAccounts
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/accounts/{id}:
+    get:
+      tags:
+        - Account
+      summary: Get Account by ID
+      operationId: getAccount
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Account object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/accounts/{id}/links/{linkType}:
+    get:
+      tags:
+        - Account
+      summary: Get linked objects from Account
+      operationId: getAccountLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/accounts/{id}/history:
+    get:
+      tags:
+        - Account
+      summary: Get version history of Account
+      operationId: getAccountHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/transactions:
+    get:
+      tags:
+        - Transaction
+      summary: List Transaction objects
+      operationId: listTransactions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[referenceId]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by referenceId
+        - name: filter[type]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by type
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[amount]
+          in: query
+          schema:
+            type: number
+            nullable: true
+          description: Filter by amount
+        - name: filter[currency]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by currency
+        - name: filter[sourceAccount]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by sourceAccount
+        - name: filter[destinationAccount]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by destinationAccount
+        - name: filter[transactionDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by transactionDate
+        - name: filter[description]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by description
+        - name: filter[country]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by country
+      responses:
+        "200":
+          description: List of Transaction objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transaction"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/transactions/aggregate:
+    get:
+      tags:
+        - Transaction
+      summary: Aggregate Transaction objects
+      operationId: aggregateTransactions
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/transactions/search:
+    get:
+      tags:
+        - Transaction
+      summary: Full-text search Transaction objects
+      operationId: searchTransactions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/transactions/{id}:
+    get:
+      tags:
+        - Transaction
+      summary: Get Transaction by ID
+      operationId: getTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Transaction object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/transactions/{id}/links/{linkType}:
+    get:
+      tags:
+        - Transaction
+      summary: Get linked objects from Transaction
+      operationId: getTransactionLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/transactions/{id}/history:
+    get:
+      tags:
+        - Transaction
+      summary: Get version history of Transaction
+      operationId: getTransactionHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/alerts:
+    get:
+      tags:
+        - Alert
+      summary: List Alert objects
+      operationId: listAlerts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[alertNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by alertNumber
+        - name: filter[severity]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by severity
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[ruleName]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by ruleName
+        - name: filter[score]
+          in: query
+          schema:
+            type: number
+            nullable: true
+          description: Filter by score
+        - name: filter[narrative]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by narrative
+        - name: filter[transaction]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by transaction
+        - name: filter[customer]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by customer
+        - name: filter[assignedTo]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by assignedTo
+        - name: filter[createdDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by createdDate
+      responses:
+        "200":
+          description: List of Alert objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Alert"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/alerts/aggregate:
+    get:
+      tags:
+        - Alert
+      summary: Aggregate Alert objects
+      operationId: aggregateAlerts
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/alerts/search:
+    get:
+      tags:
+        - Alert
+      summary: Full-text search Alert objects
+      operationId: searchAlerts
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Alert"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/alerts/{id}:
+    get:
+      tags:
+        - Alert
+      summary: Get Alert by ID
+      operationId: getAlert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Alert object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Alert"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/alerts/{id}/links/{linkType}:
+    get:
+      tags:
+        - Alert
+      summary: Get linked objects from Alert
+      operationId: getAlertLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/alerts/{id}/history:
+    get:
+      tags:
+        - Alert
+      summary: Get version history of Alert
+      operationId: getAlertHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/cases:
+    get:
+      tags:
+        - Case
+      summary: List Case objects
+      operationId: listCases
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[caseNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by caseNumber
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[priority]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by priority
+        - name: filter[assignedAnalyst]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by assignedAnalyst
+        - name: filter[summary]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by summary
+        - name: filter[openDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by openDate
+        - name: filter[closeDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by closeDate
+      responses:
+        "200":
+          description: List of Case objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Case"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/cases/aggregate:
+    get:
+      tags:
+        - Case
+      summary: Aggregate Case objects
+      operationId: aggregateCases
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/cases/search:
+    get:
+      tags:
+        - Case
+      summary: Full-text search Case objects
+      operationId: searchCases
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Case"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/cases/{id}:
+    get:
+      tags:
+        - Case
+      summary: Get Case by ID
+      operationId: getCase
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Case object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Case"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/cases/{id}/links/{linkType}:
+    get:
+      tags:
+        - Case
+      summary: Get linked objects from Case
+      operationId: getCaseLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/cases/{id}/history:
+    get:
+      tags:
+        - Case
+      summary: Get version history of Case
+      operationId: getCaseHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/suspiciousActivityReports:
+    get:
+      tags:
+        - SuspiciousActivityReport
+      summary: List SuspiciousActivityReport objects
+      operationId: listSuspiciousActivityReports
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[sarNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by sarNumber
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[filingDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by filingDate
+        - name: filter[narrative]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by narrative
+        - name: filter[amount]
+          in: query
+          schema:
+            type: number
+            nullable: true
+          description: Filter by amount
+        - name: filter[reportingEntity]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by reportingEntity
+        - name: filter[caseRef]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by caseRef
+      responses:
+        "200":
+          description: List of SuspiciousActivityReport objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SuspiciousActivityReport"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/suspiciousActivityReports/aggregate:
+    get:
+      tags:
+        - SuspiciousActivityReport
+      summary: Aggregate SuspiciousActivityReport objects
+      operationId: aggregateSuspiciousActivityReports
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/suspiciousActivityReports/search:
+    get:
+      tags:
+        - SuspiciousActivityReport
+      summary: Full-text search SuspiciousActivityReport objects
+      operationId: searchSuspiciousActivityReports
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SuspiciousActivityReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/suspiciousActivityReports/{id}:
+    get:
+      tags:
+        - SuspiciousActivityReport
+      summary: Get SuspiciousActivityReport by ID
+      operationId: getSuspiciousActivityReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: SuspiciousActivityReport object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SuspiciousActivityReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/suspiciousActivityReports/{id}/links/{linkType}:
+    get:
+      tags:
+        - SuspiciousActivityReport
+      summary: Get linked objects from SuspiciousActivityReport
+      operationId: getSuspiciousActivityReportLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/suspiciousActivityReports/{id}/history:
+    get:
+      tags:
+        - SuspiciousActivityReport
+      summary: Get version history of SuspiciousActivityReport
+      operationId: getSuspiciousActivityReportHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/patients:
+    get:
+      tags:
+        - Patient
+      summary: List Patient objects
+      operationId: listPatients
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[nhsNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by nhsNumber
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[family]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by family
+        - name: filter[given]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by given
+        - name: filter[dateOfBirth]
+          in: query
+          schema:
+            type: string
+            format: date
+            nullable: true
+          description: Filter by dateOfBirth
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[triageCategory]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by triageCategory
+        - name: filter[presentingComplaint]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by presentingComplaint
+      responses:
+        "200":
+          description: List of Patient objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Patient"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/patients/aggregate:
+    get:
+      tags:
+        - Patient
+      summary: Aggregate Patient objects
+      operationId: aggregatePatients
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/patients/search:
+    get:
+      tags:
+        - Patient
+      summary: Full-text search Patient objects
+      operationId: searchPatients
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Patient"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/patients/{id}:
+    get:
+      tags:
+        - Patient
+      summary: Get Patient by ID
+      operationId: getPatient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Patient object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Patient"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/patients/{id}/links/{linkType}:
+    get:
+      tags:
+        - Patient
+      summary: Get linked objects from Patient
+      operationId: getPatientLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/patients/{id}/history:
+    get:
+      tags:
+        - Patient
+      summary: Get version history of Patient
+      operationId: getPatientHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/wards:
+    get:
+      tags:
+        - Ward
+      summary: List Ward objects
+      operationId: listWards
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[specialty]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by specialty
+        - name: filter[capacity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by capacity
+      responses:
+        "200":
+          description: List of Ward objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ward"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/wards/aggregate:
+    get:
+      tags:
+        - Ward
+      summary: Aggregate Ward objects
+      operationId: aggregateWards
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/wards/search:
+    get:
+      tags:
+        - Ward
+      summary: Full-text search Ward objects
+      operationId: searchWards
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ward"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/wards/{id}:
+    get:
+      tags:
+        - Ward
+      summary: Get Ward by ID
+      operationId: getWard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ward object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ward"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/wards/{id}/links/{linkType}:
+    get:
+      tags:
+        - Ward
+      summary: Get linked objects from Ward
+      operationId: getWardLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/wards/{id}/history:
+    get:
+      tags:
+        - Ward
+      summary: Get version history of Ward
+      operationId: getWardHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/beds:
+    get:
+      tags:
+        - Bed
+      summary: List Bed objects
+      operationId: listBeds
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[number]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by number
+        - name: filter[type]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by type
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+      responses:
+        "200":
+          description: List of Bed objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bed"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/beds/aggregate:
+    get:
+      tags:
+        - Bed
+      summary: Aggregate Bed objects
+      operationId: aggregateBeds
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/beds/search:
+    get:
+      tags:
+        - Bed
+      summary: Full-text search Bed objects
+      operationId: searchBeds
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/beds/{id}:
+    get:
+      tags:
+        - Bed
+      summary: Get Bed by ID
+      operationId: getBed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Bed object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Bed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/beds/{id}/links/{linkType}:
+    get:
+      tags:
+        - Bed
+      summary: Get linked objects from Bed
+      operationId: getBedLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/beds/{id}/history:
+    get:
+      tags:
+        - Bed
+      summary: Get version history of Bed
+      operationId: getBedHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/consultants:
+    get:
+      tags:
+        - Consultant
+      summary: List Consultant objects
+      operationId: listConsultants
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[gmcNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by gmcNumber
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[specialty]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by specialty
+      responses:
+        "200":
+          description: List of Consultant objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Consultant"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/consultants/aggregate:
+    get:
+      tags:
+        - Consultant
+      summary: Aggregate Consultant objects
+      operationId: aggregateConsultants
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/consultants/search:
+    get:
+      tags:
+        - Consultant
+      summary: Full-text search Consultant objects
+      operationId: searchConsultants
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Consultant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/consultants/{id}:
+    get:
+      tags:
+        - Consultant
+      summary: Get Consultant by ID
+      operationId: getConsultant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Consultant object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Consultant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/consultants/{id}/links/{linkType}:
+    get:
+      tags:
+        - Consultant
+      summary: Get linked objects from Consultant
+      operationId: getConsultantLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/consultants/{id}/history:
+    get:
+      tags:
+        - Consultant
+      summary: Get version history of Consultant
+      operationId: getConsultantHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/staffs:
+    get:
+      tags:
+        - Staff
+      summary: List Staff objects
+      operationId: listStaffs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[staffId]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by staffId
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[role]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by role
+        - name: filter[specialty]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by specialty
+      responses:
+        "200":
+          description: List of Staff objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Staff"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/staffs/aggregate:
+    get:
+      tags:
+        - Staff
+      summary: Aggregate Staff objects
+      operationId: aggregateStaffs
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/staffs/search:
+    get:
+      tags:
+        - Staff
+      summary: Full-text search Staff objects
+      operationId: searchStaffs
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Staff"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/staffs/{id}:
+    get:
+      tags:
+        - Staff
+      summary: Get Staff by ID
+      operationId: getStaff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Staff object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Staff"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/staffs/{id}/links/{linkType}:
+    get:
+      tags:
+        - Staff
+      summary: Get linked objects from Staff
+      operationId: getStaffLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/staffs/{id}/history:
+    get:
+      tags:
+        - Staff
+      summary: Get version history of Staff
+      operationId: getStaffHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/dischargeRecords:
+    get:
+      tags:
+        - DischargeRecord
+      summary: List DischargeRecord objects
+      operationId: listDischargeRecords
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[patient]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by patient
+        - name: filter[ward]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by ward
+        - name: filter[destination]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by destination
+        - name: filter[dischargeDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by dischargeDate
+        - name: filter[notes]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by notes
+      responses:
+        "200":
+          description: List of DischargeRecord objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DischargeRecord"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/dischargeRecords/aggregate:
+    get:
+      tags:
+        - DischargeRecord
+      summary: Aggregate DischargeRecord objects
+      operationId: aggregateDischargeRecords
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/dischargeRecords/search:
+    get:
+      tags:
+        - DischargeRecord
+      summary: Full-text search DischargeRecord objects
+      operationId: searchDischargeRecords
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DischargeRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/dischargeRecords/{id}:
+    get:
+      tags:
+        - DischargeRecord
+      summary: Get DischargeRecord by ID
+      operationId: getDischargeRecord
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: DischargeRecord object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DischargeRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/dischargeRecords/{id}/links/{linkType}:
+    get:
+      tags:
+        - DischargeRecord
+      summary: Get linked objects from DischargeRecord
+      operationId: getDischargeRecordLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/dischargeRecords/{id}/history:
+    get:
+      tags:
+        - DischargeRecord
+      summary: Get version history of DischargeRecord
+      operationId: getDischargeRecordHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/transfers:
+    get:
+      tags:
+        - Transfer
+      summary: List Transfer objects
+      operationId: listTransfers
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[patient]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by patient
+        - name: filter[fromWard]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by fromWard
+        - name: filter[toWard]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by toWard
+        - name: filter[transferDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by transferDate
+        - name: filter[reason]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by reason
+      responses:
+        "200":
+          description: List of Transfer objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transfer"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/transfers/aggregate:
+    get:
+      tags:
+        - Transfer
+      summary: Aggregate Transfer objects
+      operationId: aggregateTransfers
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/transfers/search:
+    get:
+      tags:
+        - Transfer
+      summary: Full-text search Transfer objects
+      operationId: searchTransfers
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transfer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/transfers/{id}:
+    get:
+      tags:
+        - Transfer
+      summary: Get Transfer by ID
+      operationId: getTransfer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Transfer object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Transfer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/transfers/{id}/links/{linkType}:
+    get:
+      tags:
+        - Transfer
+      summary: Get linked objects from Transfer
+      operationId: getTransferLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/transfers/{id}/history:
+    get:
+      tags:
+        - Transfer
+      summary: Get version history of Transfer
+      operationId: getTransferHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/suppliers:
+    get:
+      tags:
+        - Supplier
+      summary: List Supplier objects
+      operationId: listSuppliers
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[code]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by code
+        - name: filter[tier]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by tier
+        - name: filter[contactName]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by contactName
+        - name: filter[contactEmail]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by contactEmail
+        - name: filter[country]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by country
+        - name: filter[leadTimeDays]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by leadTimeDays
+        - name: filter[onTimeDeliveryRate]
+          in: query
+          schema:
+            type: number
+            nullable: true
+          description: Filter by onTimeDeliveryRate
+      responses:
+        "200":
+          description: List of Supplier objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Supplier"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/suppliers/aggregate:
+    get:
+      tags:
+        - Supplier
+      summary: Aggregate Supplier objects
+      operationId: aggregateSuppliers
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/suppliers/search:
+    get:
+      tags:
+        - Supplier
+      summary: Full-text search Supplier objects
+      operationId: searchSuppliers
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Supplier"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/suppliers/{id}:
+    get:
+      tags:
+        - Supplier
+      summary: Get Supplier by ID
+      operationId: getSupplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Supplier object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Supplier"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/suppliers/{id}/links/{linkType}:
+    get:
+      tags:
+        - Supplier
+      summary: Get linked objects from Supplier
+      operationId: getSupplierLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/suppliers/{id}/history:
+    get:
+      tags:
+        - Supplier
+      summary: Get version history of Supplier
+      operationId: getSupplierHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/facilitys:
+    get:
+      tags:
+        - Facility
+      summary: List Facility objects
+      operationId: listFacilitys
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[code]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by code
+        - name: filter[type]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by type
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[address]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by address
+        - name: filter[country]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by country
+        - name: filter[capacity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by capacity
+      responses:
+        "200":
+          description: List of Facility objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Facility"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/facilitys/aggregate:
+    get:
+      tags:
+        - Facility
+      summary: Aggregate Facility objects
+      operationId: aggregateFacilitys
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/facilitys/search:
+    get:
+      tags:
+        - Facility
+      summary: Full-text search Facility objects
+      operationId: searchFacilitys
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Facility"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/facilitys/{id}:
+    get:
+      tags:
+        - Facility
+      summary: Get Facility by ID
+      operationId: getFacility
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Facility object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Facility"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/facilitys/{id}/links/{linkType}:
+    get:
+      tags:
+        - Facility
+      summary: Get linked objects from Facility
+      operationId: getFacilityLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/facilitys/{id}/history:
+    get:
+      tags:
+        - Facility
+      summary: Get version history of Facility
+      operationId: getFacilityHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/products:
+    get:
+      tags:
+        - Product
+      summary: List Product objects
+      operationId: listProducts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[sku]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by sku
+        - name: filter[name]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by name
+        - name: filter[category]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by category
+        - name: filter[unitOfMeasure]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by unitOfMeasure
+        - name: filter[reorderPoint]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by reorderPoint
+        - name: filter[reorderQuantity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by reorderQuantity
+      responses:
+        "200":
+          description: List of Product objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/products/aggregate:
+    get:
+      tags:
+        - Product
+      summary: Aggregate Product objects
+      operationId: aggregateProducts
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/products/search:
+    get:
+      tags:
+        - Product
+      summary: Full-text search Product objects
+      operationId: searchProducts
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/products/{id}:
+    get:
+      tags:
+        - Product
+      summary: Get Product by ID
+      operationId: getProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Product object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/products/{id}/links/{linkType}:
+    get:
+      tags:
+        - Product
+      summary: Get linked objects from Product
+      operationId: getProductLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/products/{id}/history:
+    get:
+      tags:
+        - Product
+      summary: Get version history of Product
+      operationId: getProductHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/purchaseOrders:
+    get:
+      tags:
+        - PurchaseOrder
+      summary: List PurchaseOrder objects
+      operationId: listPurchaseOrders
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[orderNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by orderNumber
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[supplier]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by supplier
+        - name: filter[product]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by product
+        - name: filter[quantity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by quantity
+        - name: filter[unitCost]
+          in: query
+          schema:
+            type: number
+            nullable: true
+          description: Filter by unitCost
+        - name: filter[currency]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by currency
+        - name: filter[requestedDeliveryDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by requestedDeliveryDate
+        - name: filter[notes]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by notes
+      responses:
+        "200":
+          description: List of PurchaseOrder objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PurchaseOrder"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/purchaseOrders/aggregate:
+    get:
+      tags:
+        - PurchaseOrder
+      summary: Aggregate PurchaseOrder objects
+      operationId: aggregatePurchaseOrders
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/purchaseOrders/search:
+    get:
+      tags:
+        - PurchaseOrder
+      summary: Full-text search PurchaseOrder objects
+      operationId: searchPurchaseOrders
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PurchaseOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/purchaseOrders/{id}:
+    get:
+      tags:
+        - PurchaseOrder
+      summary: Get PurchaseOrder by ID
+      operationId: getPurchaseOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: PurchaseOrder object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PurchaseOrder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/purchaseOrders/{id}/links/{linkType}:
+    get:
+      tags:
+        - PurchaseOrder
+      summary: Get linked objects from PurchaseOrder
+      operationId: getPurchaseOrderLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/purchaseOrders/{id}/history:
+    get:
+      tags:
+        - PurchaseOrder
+      summary: Get version history of PurchaseOrder
+      operationId: getPurchaseOrderHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/shipments:
+    get:
+      tags:
+        - Shipment
+      summary: List Shipment objects
+      operationId: listShipments
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[trackingNumber]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by trackingNumber
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by status
+        - name: filter[transportMode]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by transportMode
+        - name: filter[quantity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by quantity
+        - name: filter[departureDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by departureDate
+        - name: filter[estimatedArrival]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by estimatedArrival
+        - name: filter[actualArrival]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by actualArrival
+        - name: filter[order]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by order
+        - name: filter[origin]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by origin
+        - name: filter[destination]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by destination
+      responses:
+        "200":
+          description: List of Shipment objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Shipment"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/shipments/aggregate:
+    get:
+      tags:
+        - Shipment
+      summary: Aggregate Shipment objects
+      operationId: aggregateShipments
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/shipments/search:
+    get:
+      tags:
+        - Shipment
+      summary: Full-text search Shipment objects
+      operationId: searchShipments
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Shipment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/shipments/{id}:
+    get:
+      tags:
+        - Shipment
+      summary: Get Shipment by ID
+      operationId: getShipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Shipment object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Shipment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/shipments/{id}/links/{linkType}:
+    get:
+      tags:
+        - Shipment
+      summary: Get linked objects from Shipment
+      operationId: getShipmentLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/shipments/{id}/history:
+    get:
+      tags:
+        - Shipment
+      summary: Get version history of Shipment
+      operationId: getShipmentHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/inventoryRecords:
+    get:
+      tags:
+        - InventoryRecord
+      summary: List InventoryRecord objects
+      operationId: listInventoryRecords
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+        - name: filter[quantity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by quantity
+        - name: filter[reservedQuantity]
+          in: query
+          schema:
+            type: integer
+            nullable: true
+          description: Filter by reservedQuantity
+        - name: filter[stockLevel]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by stockLevel
+        - name: filter[lastCountDate]
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter by lastCountDate
+        - name: filter[product]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by product
+        - name: filter[facility]
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by facility
+      responses:
+        "200":
+          description: List of InventoryRecord objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InventoryRecord"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/inventoryRecords/aggregate:
+    get:
+      tags:
+        - InventoryRecord
+      summary: Aggregate InventoryRecord objects
+      operationId: aggregateInventoryRecords
+      parameters:
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated field:function pairs (e.g. age:avg,salary:sum)
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+          description: Field to group by
+      responses:
+        "200":
+          description: Aggregation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/inventoryRecords/search:
+    get:
+      tags:
+        - InventoryRecord
+      summary: Full-text search InventoryRecord objects
+      operationId: searchInventoryRecords
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InventoryRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/inventoryRecords/{id}:
+    get:
+      tags:
+        - InventoryRecord
+      summary: Get InventoryRecord by ID
+      operationId: getInventoryRecord
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: InventoryRecord object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/InventoryRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/inventoryRecords/{id}/links/{linkType}:
+    get:
+      tags:
+        - InventoryRecord
+      summary: Get linked objects from InventoryRecord
+      operationId: getInventoryRecordLinks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: linkType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Linked objects
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/inventoryRecords/{id}/history:
+    get:
+      tags:
+        - InventoryRecord
+      summary: Get version history of InventoryRecord
+      operationId: getInventoryRecordHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Not found
+  /api/v1/actions/FlagTransaction:
+    post:
+      tags:
+        - Actions
+      summary: Execute FlagTransaction
+      operationId: executeFlagTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction:
+                  type: string
+                customer:
+                  type: string
+                alertNumber:
+                  type: string
+                severity:
+                  type: string
+                ruleName:
+                  type: string
+                score:
+                  type: number
+                  nullable: true
+                narrative:
+                  type: string
+                  nullable: true
+              required:
+                - transaction
+                - customer
+                - alertNumber
+                - severity
+                - ruleName
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/OpenCase:
+    post:
+      tags:
+        - Actions
+      summary: Execute OpenCase
+      operationId: executeOpenCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                caseNumber:
+                  type: string
+                priority:
+                  type: string
+                assignedAnalyst:
+                  type: string
+                summary:
+                  type: string
+                  nullable: true
+              required:
+                - caseNumber
+                - priority
+                - assignedAnalyst
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/AssignAlertToCase:
+    post:
+      tags:
+        - Actions
+      summary: Execute AssignAlertToCase
+      operationId: executeAssignAlertToCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alert:
+                  type: string
+                investigationCase:
+                  type: string
+              required:
+                - alert
+                - investigationCase
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/FreezeAccount:
+    post:
+      tags:
+        - Actions
+      summary: Execute FreezeAccount
+      operationId: executeFreezeAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account:
+                  type: string
+                reason:
+                  type: string
+              required:
+                - account
+                - reason
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/FileReport:
+    post:
+      tags:
+        - Actions
+      summary: Execute FileReport
+      operationId: executeFileReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                investigationCase:
+                  type: string
+                sarNumber:
+                  type: string
+                narrative:
+                  type: string
+                amount:
+                  type: number
+                reportingEntity:
+                  type: string
+              required:
+                - investigationCase
+                - sarNumber
+                - narrative
+                - amount
+                - reportingEntity
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/SubmitReport:
+    post:
+      tags:
+        - Actions
+      summary: Execute SubmitReport
+      operationId: executeSubmitReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sar:
+                  type: string
+                investigationCase:
+                  type: string
+              required:
+                - sar
+                - investigationCase
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/AdmitPatient:
+    post:
+      tags:
+        - Actions
+      summary: Execute AdmitPatient
+      operationId: executeAdmitPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patient:
+                  type: string
+                ward:
+                  type: string
+                bed:
+                  type: string
+                  nullable: true
+                consultant:
+                  type: string
+                reason:
+                  type: string
+                  nullable: true
+              required:
+                - patient
+                - ward
+                - consultant
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/DischargePatient:
+    post:
+      tags:
+        - Actions
+      summary: Execute DischargePatient
+      operationId: executeDischargePatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patient:
+                  type: string
+                destination:
+                  type: string
+                notes:
+                  type: string
+                  nullable: true
+              required:
+                - patient
+                - destination
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/TransferWard:
+    post:
+      tags:
+        - Actions
+      summary: Execute TransferWard
+      operationId: executeTransferWard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patient:
+                  type: string
+                toWard:
+                  type: string
+                toBed:
+                  type: string
+                  nullable: true
+                reason:
+                  type: string
+                  nullable: true
+              required:
+                - patient
+                - toWard
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/CleanBed:
+    post:
+      tags:
+        - Actions
+      summary: Execute CleanBed
+      operationId: executeCleanBed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bed:
+                  type: string
+              required:
+                - bed
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/RegisterPatient:
+    post:
+      tags:
+        - Actions
+      summary: Execute RegisterPatient
+      operationId: executeRegisterPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                dateOfBirth:
+                  type: string
+                  format: date
+                nhsNumber:
+                  type: string
+                  nullable: true
+                triageCategory:
+                  type: string
+                  nullable: true
+                presentingComplaint:
+                  type: string
+                  nullable: true
+                consent:
+                  type: boolean
+                  nullable: true
+              required:
+                - name
+                - dateOfBirth
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/CreateOrder:
+    post:
+      tags:
+        - Actions
+      summary: Execute CreateOrder
+      operationId: executeCreateOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                supplier:
+                  type: string
+                product:
+                  type: string
+                orderNumber:
+                  type: string
+                quantity:
+                  type: integer
+                unitCost:
+                  type: number
+                currency:
+                  type: string
+                requestedDeliveryDate:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+                  nullable: true
+              required:
+                - supplier
+                - product
+                - orderNumber
+                - quantity
+                - unitCost
+                - currency
+                - requestedDeliveryDate
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/ShipOrder:
+    post:
+      tags:
+        - Actions
+      summary: Execute ShipOrder
+      operationId: executeShipOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: string
+                origin:
+                  type: string
+                destination:
+                  type: string
+                trackingNumber:
+                  type: string
+                  nullable: true
+                transportMode:
+                  type: string
+                estimatedArrival:
+                  type: string
+                  format: date-time
+              required:
+                - order
+                - origin
+                - destination
+                - transportMode
+                - estimatedArrival
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/ReceiveShipment:
+    post:
+      tags:
+        - Actions
+      summary: Execute ReceiveShipment
+      operationId: executeReceiveShipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shipment:
+                  type: string
+                order:
+                  type: string
+                destination:
+                  type: string
+                product:
+                  type: string
+                  nullable: true
+                inventoryRecord:
+                  type: string
+                  nullable: true
+                receivedQuantity:
+                  type: integer
+                stockLevel:
+                  type: string
+              required:
+                - shipment
+                - order
+                - destination
+                - receivedQuantity
+                - stockLevel
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/actions/CancelOrder:
+    post:
+      tags:
+        - Actions
+      summary: Execute CancelOrder
+      operationId: executeCancelOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: string
+                reason:
+                  type: string
+                  nullable: true
+              required:
+                - order
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                    nullable: true
+        "400":
+          description: Validation error or precondition failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/relationships:
+    post:
+      tags:
+        - Governance
+      summary: Grant a directly-assignable ReBAC relationship (care-team)
+      operationId: grantRelationship
+      requestBody: &a2
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user
+                - relation
+                - objectType
+                - objectId
+              properties:
+                user:
+                  type: string
+                  description: Subject user id (bare or `user:<id>`).
+                relation:
+                  type: string
+                  description: A directly-grantable `[user]` relation from the merged FGA model.
+                objectType:
+                  type: string
+                  description: Object type (e.g. Patient, Ward).
+                objectId:
+                  type: string
+      responses:
+        "200":
+          description: Relationship granted
+        "400":
+          description: Invalid/non-grantable relation or missing field
+          content: &a1
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Caller lacks a granter role
+          content: *a1
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags:
+        - Governance
+      summary: Revoke a directly-assignable ReBAC relationship
+      operationId: revokeRelationship
+      requestBody: *a2
+      responses:
+        "200":
+          description: Relationship revoked
+        "400":
+          description: Invalid/non-grantable relation or missing field
+          content: *a1
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Caller lacks a granter role
+          content: *a1
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/consent:
+    post:
+      tags:
+        - Governance
+      summary: Record a consent decision for a data subject
+      operationId: recordConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+              properties:
+                subject:
+                  type: string
+                  description: Consent subject id.
+                purpose:
+                  type: string
+                  description: A DataPurpose from the deployment vocabulary (CONSENT_PURPOSES); default DEFAULT_CONSENT_PURPOSE.
+                decision:
+                  type: string
+                  enum:
+                    - GRANT
+                    - DENY
+                  default: GRANT
+                evidence:
+                  type: string
+      responses:
+        "200":
+          description: Consent recorded
+        "400":
+          description: Validation error (unknown purpose / invalid decision / missing subject)
+          content: *a1
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Caller lacks a consent-recorder role
+          content: *a1
+        "429":
+          $ref: "#/components/responses/RateLimited"
+components:
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        externalId:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        riskLevel:
+          type: string
+        kycStatus:
+          type: string
+        kycExpiryDate:
+          type: string
+          format: date
+          nullable: true
+        country:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+        taxId:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - externalId
+        - name
+        - type
+        - riskLevel
+        - kycStatus
+        - country
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountNumber:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        currency:
+          type: string
+        customer:
+          type: string
+        openDate:
+          type: string
+          format: date
+        lastActivityDate:
+          type: string
+          format: date-time
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - accountNumber
+        - type
+        - status
+        - currency
+        - customer
+        - openDate
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        referenceId:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        sourceAccount:
+          type: string
+        destinationAccount:
+          type: string
+          nullable: true
+        transactionDate:
+          type: string
+          format: date-time
+        description:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - referenceId
+        - type
+        - status
+        - amount
+        - currency
+        - sourceAccount
+        - transactionDate
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        alertNumber:
+          type: string
+        severity:
+          type: string
+        status:
+          type: string
+        ruleName:
+          type: string
+        score:
+          type: number
+          nullable: true
+        narrative:
+          type: string
+          nullable: true
+        transaction:
+          type: string
+          nullable: true
+        customer:
+          type: string
+        assignedTo:
+          type: string
+          nullable: true
+        createdDate:
+          type: string
+          format: date-time
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - alertNumber
+        - severity
+        - status
+        - ruleName
+        - customer
+        - createdDate
+    Case:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        caseNumber:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        assignedAnalyst:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        openDate:
+          type: string
+          format: date-time
+        closeDate:
+          type: string
+          format: date-time
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - caseNumber
+        - status
+        - priority
+        - assignedAnalyst
+        - openDate
+    SuspiciousActivityReport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sarNumber:
+          type: string
+        status:
+          type: string
+        filingDate:
+          type: string
+          format: date-time
+        narrative:
+          type: string
+        amount:
+          type: number
+        reportingEntity:
+          type: string
+        caseRef:
+          type: string
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - sarNumber
+        - status
+        - filingDate
+        - narrative
+        - amount
+        - reportingEntity
+        - caseRef
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nhsNumber:
+          type: string
+          nullable: true
+        name:
+          type: string
+        family:
+          type: string
+          nullable: true
+        given:
+          type: string
+          nullable: true
+        dateOfBirth:
+          type: string
+          format: date
+        status:
+          type: string
+        triageCategory:
+          type: string
+          nullable: true
+        presentingComplaint:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - name
+        - dateOfBirth
+        - status
+    Ward:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        specialty:
+          type: string
+        capacity:
+          type: integer
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - name
+        - specialty
+        - capacity
+    Bed:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - number
+        - type
+        - status
+    Consultant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        gmcNumber:
+          type: string
+          nullable: true
+        name:
+          type: string
+        specialty:
+          type: string
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - name
+        - specialty
+    Staff:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        staffId:
+          type: string
+          nullable: true
+        name:
+          type: string
+        role:
+          type: string
+        specialty:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - name
+        - role
+    DischargeRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient:
+          type: string
+        ward:
+          type: string
+        destination:
+          type: string
+        dischargeDate:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - patient
+        - ward
+        - destination
+        - dischargeDate
+    Transfer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient:
+          type: string
+        fromWard:
+          type: string
+        toWard:
+          type: string
+        transferDate:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - patient
+        - fromWard
+        - toWard
+        - transferDate
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        tier:
+          type: string
+        contactName:
+          type: string
+          nullable: true
+        contactEmail:
+          type: string
+          nullable: true
+        country:
+          type: string
+        leadTimeDays:
+          type: integer
+          nullable: true
+        onTimeDeliveryRate:
+          type: number
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - name
+        - code
+        - tier
+        - country
+    Facility:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        address:
+          type: string
+          nullable: true
+        country:
+          type: string
+        capacity:
+          type: integer
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - name
+        - code
+        - type
+        - status
+        - country
+        - capacity
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        unitOfMeasure:
+          type: string
+        reorderPoint:
+          type: integer
+        reorderQuantity:
+          type: integer
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - sku
+        - name
+        - category
+        - unitOfMeasure
+        - reorderPoint
+        - reorderQuantity
+    PurchaseOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        status:
+          type: string
+        supplier:
+          type: string
+        product:
+          type: string
+        quantity:
+          type: integer
+        unitCost:
+          type: number
+        currency:
+          type: string
+        requestedDeliveryDate:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - orderNumber
+        - status
+        - supplier
+        - product
+        - quantity
+        - unitCost
+        - currency
+        - requestedDeliveryDate
+    Shipment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        trackingNumber:
+          type: string
+          nullable: true
+        status:
+          type: string
+        transportMode:
+          type: string
+        quantity:
+          type: integer
+        departureDate:
+          type: string
+          format: date-time
+          nullable: true
+        estimatedArrival:
+          type: string
+          format: date-time
+          nullable: true
+        actualArrival:
+          type: string
+          format: date-time
+          nullable: true
+        order:
+          type: string
+        origin:
+          type: string
+        destination:
+          type: string
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - status
+        - transportMode
+        - quantity
+        - order
+        - origin
+        - destination
+    InventoryRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        reservedQuantity:
+          type: integer
+        stockLevel:
+          type: string
+        lastCountDate:
+          type: string
+          format: date-time
+          nullable: true
+        product:
+          type: string
+        facility:
+          type: string
+        _redactedFields:
+          type: array
+          items:
+            type: string
+          nullable: true
+        _consentRestricted:
+          type: boolean
+      required:
+        - id
+        - quantity
+        - reservedQuantity
+        - stockLevel
+        - product
+        - facility
+    CustomerType:
+      type: string
+      enum:
+        - INDIVIDUAL
+        - ORGANIZATION
+    RiskLevel:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - VERY_HIGH
+        - PROHIBITED
+    KycStatus:
+      type: string
+      enum:
+        - PENDING
+        - VERIFIED
+        - EXPIRED
+        - REJECTED
+    AccountStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - FROZEN
+        - CLOSED
+        - DORMANT
+    AccountType:
+      type: string
+      enum:
+        - CHECKING
+        - SAVINGS
+        - INVESTMENT
+        - CORRESPONDENT
+    TransactionStatus:
+      type: string
+      enum:
+        - PENDING
+        - CLEARED
+        - FLAGGED
+        - BLOCKED
+        - REVERSED
+    TransactionType:
+      type: string
+      enum:
+        - WIRE
+        - ACH
+        - CASH_DEPOSIT
+        - CASH_WITHDRAWAL
+        - INTERNAL_TRANSFER
+        - FOREIGN_EXCHANGE
+    AlertSeverity:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - CRITICAL
+    AlertStatus:
+      type: string
+      enum:
+        - OPEN
+        - INVESTIGATING
+        - ESCALATED
+        - DISMISSED
+        - CONFIRMED
+    CaseStatus:
+      type: string
+      enum:
+        - OPEN
+        - UNDER_REVIEW
+        - ESCALATED
+        - CLOSED_NO_ACTION
+        - CLOSED_SAR_FILED
+    SarStatus:
+      type: string
+      enum:
+        - DRAFT
+        - SUBMITTED
+        - ACKNOWLEDGED
+        - REJECTED
+    PatientStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - DISCHARGED
+        - DECEASED
+        - TRANSFERRED
+    TriageCategory:
+      type: string
+      enum:
+        - P1_IMMEDIATE
+        - P2_URGENT
+        - P3_DELAYED
+        - P4_EXPECTANT
+    DischargeDestination:
+      type: string
+      enum:
+        - HOME
+        - CARE_HOME
+        - VIRTUAL_WARD
+        - TRANSFER
+        - DECEASED
+    BedType:
+      type: string
+      enum:
+        - STANDARD
+        - ICU
+        - HDU
+        - ISOLATION
+        - TROLLEY
+    BedStatus:
+      type: string
+      enum:
+        - AVAILABLE
+        - OCCUPIED
+        - CLEANING
+        - OUT_OF_SERVICE
+    CareRole:
+      type: string
+      enum:
+        - PRIMARY
+        - SECONDARY
+        - ON_CALL
+    StaffRole:
+      type: string
+      enum:
+        - NURSE
+        - PHYSICIAN
+        - ALLIED_HEALTH_PROFESSIONAL
+        - HEALTHCARE_ASSISTANT
+        - ADMINISTRATIVE
+        - PORTER
+    FacilityType:
+      type: string
+      enum:
+        - FACTORY
+        - WAREHOUSE
+        - DISTRIBUTION_CENTER
+        - PORT
+    FacilityStatus:
+      type: string
+      enum:
+        - OPERATIONAL
+        - MAINTENANCE
+        - DISRUPTED
+        - CLOSED
+    SupplierTier:
+      type: string
+      enum:
+        - STRATEGIC
+        - PREFERRED
+        - APPROVED
+        - PROBATION
+    OrderStatus:
+      type: string
+      enum:
+        - DRAFT
+        - SUBMITTED
+        - CONFIRMED
+        - IN_PRODUCTION
+        - SHIPPED
+        - DELIVERED
+        - CANCELLED
+    ShipmentStatus:
+      type: string
+      enum:
+        - PENDING
+        - IN_TRANSIT
+        - DELAYED
+        - CUSTOMS_HOLD
+        - DELIVERED
+        - LOST
+    TransportMode:
+      type: string
+      enum:
+        - SEA
+        - AIR
+        - ROAD
+        - RAIL
+        - MULTIMODAL
+    StockLevel:
+      type: string
+      enum:
+        - OVERSTOCKED
+        - ADEQUATE
+        - LOW
+        - CRITICAL
+        - STOCKOUT
+    Pagination:
+      type: object
+      properties:
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            category:
+              type: string
+            message:
+              type: string
+            retryable:
+              type: boolean
+            details:
+              type: object
+            traceId:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit resets
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+security:
+  - bearerAuth: []

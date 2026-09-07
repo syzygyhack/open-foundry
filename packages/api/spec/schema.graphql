@@ -1,0 +1,2346 @@
+scalar Date
+scalar DateTime
+scalar Duration
+scalar GeoPoint
+scalar JSON
+scalar URI
+
+enum CustomerType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+  PROHIBITED
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  REJECTED
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+  DORMANT
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  INVESTMENT
+  CORRESPONDENT
+}
+
+enum TransactionStatus {
+  PENDING
+  CLEARED
+  FLAGGED
+  BLOCKED
+  REVERSED
+}
+
+enum TransactionType {
+  WIRE
+  ACH
+  CASH_DEPOSIT
+  CASH_WITHDRAWAL
+  INTERNAL_TRANSFER
+  FOREIGN_EXCHANGE
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  INVESTIGATING
+  ESCALATED
+  DISMISSED
+  CONFIRMED
+}
+
+enum CaseStatus {
+  OPEN
+  UNDER_REVIEW
+  ESCALATED
+  CLOSED_NO_ACTION
+  CLOSED_SAR_FILED
+}
+
+enum SarStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
+  REJECTED
+}
+
+enum PatientStatus {
+  ACTIVE
+  DISCHARGED
+  DECEASED
+  TRANSFERRED
+}
+
+enum TriageCategory {
+  P1_IMMEDIATE
+  P2_URGENT
+  P3_DELAYED
+  P4_EXPECTANT
+}
+
+enum DischargeDestination {
+  HOME
+  CARE_HOME
+  VIRTUAL_WARD
+  TRANSFER
+  DECEASED
+}
+
+enum BedType {
+  STANDARD
+  ICU
+  HDU
+  ISOLATION
+  TROLLEY
+}
+
+enum BedStatus {
+  AVAILABLE
+  OCCUPIED
+  CLEANING
+  OUT_OF_SERVICE
+}
+
+enum CareRole {
+  PRIMARY
+  SECONDARY
+  ON_CALL
+}
+
+enum StaffRole {
+  NURSE
+  PHYSICIAN
+  ALLIED_HEALTH_PROFESSIONAL
+  HEALTHCARE_ASSISTANT
+  ADMINISTRATIVE
+  PORTER
+}
+
+enum FacilityType {
+  FACTORY
+  WAREHOUSE
+  DISTRIBUTION_CENTER
+  PORT
+}
+
+enum FacilityStatus {
+  OPERATIONAL
+  MAINTENANCE
+  DISRUPTED
+  CLOSED
+}
+
+enum SupplierTier {
+  STRATEGIC
+  PREFERRED
+  APPROVED
+  PROBATION
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  CONFIRMED
+  IN_PRODUCTION
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ShipmentStatus {
+  PENDING
+  IN_TRANSIT
+  DELAYED
+  CUSTOMS_HOLD
+  DELIVERED
+  LOST
+}
+
+enum TransportMode {
+  SEA
+  AIR
+  ROAD
+  RAIL
+  MULTIMODAL
+}
+
+enum StockLevel {
+  OVERSTOCKED
+  ADEQUATE
+  LOW
+  CRITICAL
+  STOCKOUT
+}
+
+# ─── Shared types ───
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+enum ChangeType {
+  CREATED
+  UPDATED
+  DELETED
+}
+
+# Provenance of a change event: the action that caused it (null for
+# direct/non-action mutations). Mirrors the runtime ChangeEvent.causedBy
+# and spec Section 8.1 (causedBy: ActionReference).
+type ActionReference {
+  actionType: String
+  actionId: String
+}
+
+type ActionError {
+  code: String!
+  message: String!
+  field: String
+}
+
+type AffectedObject {
+  typeName: String!
+  id: ID!
+  changeType: ChangeType!
+}
+
+# ─── Tool Discovery (Section 5.7) ───
+
+enum ToolKind {
+  ACTION
+  FUNCTION
+}
+
+type ToolDescriptor {
+  name: String!
+  kind: ToolKind!
+  description: String!
+  parameters: JSON!
+  returnType: JSON!
+  requiredPermissions: [String!]!
+  dryRunSupported: Boolean!
+  reversible: Boolean!
+  tags: [String!]!
+}
+
+input ToolFilter {
+  kind: ToolKind
+  tags: [String!]
+}
+
+# ─── Object Sets (Section 8.3) ───
+
+type ObjectSet {
+  id: ID!
+  name: String!
+  description: String
+  objectType: String!
+  filter: JSON
+  orderBy: JSON
+  limit: Int
+  aggregation: JSON
+  isPublic: Boolean!
+  createdBy: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreateObjectSetInput {
+  name: String!
+  description: String
+  objectType: String!
+  filter: JSON
+  orderBy: JSON
+  limit: Int
+  aggregation: JSON
+  isPublic: Boolean
+}
+
+input UpdateObjectSetInput {
+  name: String
+  description: String
+  filter: JSON
+  orderBy: JSON
+  limit: Int
+  aggregation: JSON
+  isPublic: Boolean
+}
+
+# ─── Relationship (care-team) grants (v0.2.0 A1) ───
+
+input RelationshipInput {
+  user: ID!
+  relation: String!
+  objectType: String!
+  objectId: ID!
+}
+
+type RelationshipResult {
+  subject: String!
+  relation: String!
+  object: String!
+  ok: Boolean!
+}
+
+# ─── Consent record (v0.2.0 A2) ───
+
+input ConsentInput {
+  subject: ID!
+  purpose: String
+  decision: String
+  evidence: String
+}
+
+type ConsentResult {
+  subject: String!
+  purpose: String!
+  decision: String!
+  recorded: Boolean!
+}
+
+# ─── Bulk Actions (Section 5.5) ───
+
+input BulkActionInput {
+  actionType: String!
+  items: [JSON!]!
+  idempotencyKey: String!
+  allOrNothing: Boolean
+  dryRun: Boolean
+}
+
+enum BulkJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+type BulkProgress {
+  total: Int!
+  succeeded: Int!
+  failed: Int!
+  pending: Int!
+}
+
+type BulkSummary {
+  totalItems: Int!
+  succeededCount: Int!
+  failedCount: Int!
+}
+
+type BulkItemError {
+  index: Int!
+  code: String!
+  message: String!
+}
+
+type BulkActionJob {
+  id: ID!
+  status: BulkJobStatus!
+  submittedAt: DateTime!
+  completedAt: DateTime
+  progress: BulkProgress!
+  summary: BulkSummary
+  errors: [BulkItemError!]
+}
+
+input IDFilter {
+  eq: ID
+  ne: ID
+  in: [ID!]
+}
+
+input StringFilter {
+  eq: String
+  ne: String
+  in: [String!]
+  contains: String
+  startsWith: String
+}
+
+input DateFilter {
+  eq: Date
+  ne: Date
+  in: [Date!]
+  gt: Date
+  gte: Date
+  lt: Date
+  lte: Date
+}
+
+input DateTimeFilter {
+  eq: DateTime
+  ne: DateTime
+  in: [DateTime!]
+  gt: DateTime
+  gte: DateTime
+  lt: DateTime
+  lte: DateTime
+}
+
+input FloatFilter {
+  eq: Float
+  ne: Float
+  in: [Float!]
+  gt: Float
+  gte: Float
+  lt: Float
+  lte: Float
+}
+
+input IntFilter {
+  eq: Int
+  ne: Int
+  in: [Int!]
+  gt: Int
+  gte: Int
+  lt: Int
+  lte: Int
+}
+
+input CustomerTypeFilter {
+  eq: CustomerType
+  ne: CustomerType
+  in: [CustomerType!]
+}
+
+input RiskLevelFilter {
+  eq: RiskLevel
+  ne: RiskLevel
+  in: [RiskLevel!]
+}
+
+input KycStatusFilter {
+  eq: KycStatus
+  ne: KycStatus
+  in: [KycStatus!]
+}
+
+input AccountTypeFilter {
+  eq: AccountType
+  ne: AccountType
+  in: [AccountType!]
+}
+
+input AccountStatusFilter {
+  eq: AccountStatus
+  ne: AccountStatus
+  in: [AccountStatus!]
+}
+
+input TransactionTypeFilter {
+  eq: TransactionType
+  ne: TransactionType
+  in: [TransactionType!]
+}
+
+input TransactionStatusFilter {
+  eq: TransactionStatus
+  ne: TransactionStatus
+  in: [TransactionStatus!]
+}
+
+input AlertSeverityFilter {
+  eq: AlertSeverity
+  ne: AlertSeverity
+  in: [AlertSeverity!]
+}
+
+input AlertStatusFilter {
+  eq: AlertStatus
+  ne: AlertStatus
+  in: [AlertStatus!]
+}
+
+input CaseStatusFilter {
+  eq: CaseStatus
+  ne: CaseStatus
+  in: [CaseStatus!]
+}
+
+input SarStatusFilter {
+  eq: SarStatus
+  ne: SarStatus
+  in: [SarStatus!]
+}
+
+input PatientStatusFilter {
+  eq: PatientStatus
+  ne: PatientStatus
+  in: [PatientStatus!]
+}
+
+input TriageCategoryFilter {
+  eq: TriageCategory
+  ne: TriageCategory
+  in: [TriageCategory!]
+}
+
+input BedTypeFilter {
+  eq: BedType
+  ne: BedType
+  in: [BedType!]
+}
+
+input BedStatusFilter {
+  eq: BedStatus
+  ne: BedStatus
+  in: [BedStatus!]
+}
+
+input StaffRoleFilter {
+  eq: StaffRole
+  ne: StaffRole
+  in: [StaffRole!]
+}
+
+input DischargeDestinationFilter {
+  eq: DischargeDestination
+  ne: DischargeDestination
+  in: [DischargeDestination!]
+}
+
+input SupplierTierFilter {
+  eq: SupplierTier
+  ne: SupplierTier
+  in: [SupplierTier!]
+}
+
+input FacilityTypeFilter {
+  eq: FacilityType
+  ne: FacilityType
+  in: [FacilityType!]
+}
+
+input FacilityStatusFilter {
+  eq: FacilityStatus
+  ne: FacilityStatus
+  in: [FacilityStatus!]
+}
+
+input OrderStatusFilter {
+  eq: OrderStatus
+  ne: OrderStatus
+  in: [OrderStatus!]
+}
+
+input ShipmentStatusFilter {
+  eq: ShipmentStatus
+  ne: ShipmentStatus
+  in: [ShipmentStatus!]
+}
+
+input TransportModeFilter {
+  eq: TransportMode
+  ne: TransportMode
+  in: [TransportMode!]
+}
+
+input StockLevelFilter {
+  eq: StockLevel
+  ne: StockLevel
+  in: [StockLevel!]
+}
+
+type Customer {
+  id: ID!
+  externalId: String
+  name: String
+  type: CustomerType
+  riskLevel: RiskLevel
+  kycStatus: KycStatus
+  kycExpiryDate: Date
+  country: String
+  dateOfBirth: Date
+  taxId: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type CustomerConnection {
+  edges: [CustomerEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type CustomerEdge {
+  node: Customer!
+  cursor: String!
+}
+
+input CustomerFilter {
+  id: IDFilter
+  externalId: StringFilter
+  name: StringFilter
+  type: CustomerTypeFilter
+  riskLevel: RiskLevelFilter
+  kycStatus: KycStatusFilter
+  kycExpiryDate: DateFilter
+  country: StringFilter
+  dateOfBirth: DateFilter
+  taxId: StringFilter
+  AND: [CustomerFilter!]
+  OR: [CustomerFilter!]
+  NOT: CustomerFilter
+}
+
+input CustomerOrderBy {
+  id: SortDirection
+  externalId: SortDirection
+  name: SortDirection
+  type: SortDirection
+  riskLevel: SortDirection
+  kycStatus: SortDirection
+  kycExpiryDate: SortDirection
+  country: SortDirection
+  dateOfBirth: SortDirection
+  taxId: SortDirection
+}
+
+type CustomerChangeEvent {
+  changeType: ChangeType!
+  object: Customer!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Account {
+  id: ID!
+  accountNumber: String
+  type: AccountType
+  status: AccountStatus
+  currency: String
+  customer: String
+  openDate: Date
+  lastActivityDate: DateTime
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type AccountConnection {
+  edges: [AccountEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AccountEdge {
+  node: Account!
+  cursor: String!
+}
+
+input AccountFilter {
+  id: IDFilter
+  accountNumber: StringFilter
+  type: AccountTypeFilter
+  status: AccountStatusFilter
+  currency: StringFilter
+  customer: StringFilter
+  openDate: DateFilter
+  lastActivityDate: DateTimeFilter
+  AND: [AccountFilter!]
+  OR: [AccountFilter!]
+  NOT: AccountFilter
+}
+
+input AccountOrderBy {
+  id: SortDirection
+  accountNumber: SortDirection
+  type: SortDirection
+  status: SortDirection
+  currency: SortDirection
+  customer: SortDirection
+  openDate: SortDirection
+  lastActivityDate: SortDirection
+}
+
+type AccountChangeEvent {
+  changeType: ChangeType!
+  object: Account!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Transaction {
+  id: ID!
+  referenceId: String
+  type: TransactionType
+  status: TransactionStatus
+  amount: Float
+  currency: String
+  sourceAccount: String
+  destinationAccount: String
+  transactionDate: DateTime
+  description: String
+  country: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type TransactionConnection {
+  edges: [TransactionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type TransactionEdge {
+  node: Transaction!
+  cursor: String!
+}
+
+input TransactionFilter {
+  id: IDFilter
+  referenceId: StringFilter
+  type: TransactionTypeFilter
+  status: TransactionStatusFilter
+  amount: FloatFilter
+  currency: StringFilter
+  sourceAccount: StringFilter
+  destinationAccount: StringFilter
+  transactionDate: DateTimeFilter
+  description: StringFilter
+  country: StringFilter
+  AND: [TransactionFilter!]
+  OR: [TransactionFilter!]
+  NOT: TransactionFilter
+}
+
+input TransactionOrderBy {
+  id: SortDirection
+  referenceId: SortDirection
+  type: SortDirection
+  status: SortDirection
+  amount: SortDirection
+  currency: SortDirection
+  sourceAccount: SortDirection
+  destinationAccount: SortDirection
+  transactionDate: SortDirection
+  description: SortDirection
+  country: SortDirection
+}
+
+type TransactionChangeEvent {
+  changeType: ChangeType!
+  object: Transaction!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Alert {
+  id: ID!
+  alertNumber: String
+  severity: AlertSeverity
+  status: AlertStatus
+  ruleName: String
+  score: Float
+  narrative: String
+  transaction: String
+  customer: String
+  assignedTo: String
+  createdDate: DateTime
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type AlertConnection {
+  edges: [AlertEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AlertEdge {
+  node: Alert!
+  cursor: String!
+}
+
+input AlertFilter {
+  id: IDFilter
+  alertNumber: StringFilter
+  severity: AlertSeverityFilter
+  status: AlertStatusFilter
+  ruleName: StringFilter
+  score: FloatFilter
+  narrative: StringFilter
+  transaction: StringFilter
+  customer: StringFilter
+  assignedTo: StringFilter
+  createdDate: DateTimeFilter
+  AND: [AlertFilter!]
+  OR: [AlertFilter!]
+  NOT: AlertFilter
+}
+
+input AlertOrderBy {
+  id: SortDirection
+  alertNumber: SortDirection
+  severity: SortDirection
+  status: SortDirection
+  ruleName: SortDirection
+  score: SortDirection
+  narrative: SortDirection
+  transaction: SortDirection
+  customer: SortDirection
+  assignedTo: SortDirection
+  createdDate: SortDirection
+}
+
+type AlertChangeEvent {
+  changeType: ChangeType!
+  object: Alert!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Case {
+  id: ID!
+  caseNumber: String
+  status: CaseStatus
+  priority: AlertSeverity
+  assignedAnalyst: String
+  summary: String
+  openDate: DateTime
+  closeDate: DateTime
+  alertCount: Int
+  alerts: [Alert!]
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type CaseConnection {
+  edges: [CaseEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type CaseEdge {
+  node: Case!
+  cursor: String!
+}
+
+input CaseFilter {
+  id: IDFilter
+  caseNumber: StringFilter
+  status: CaseStatusFilter
+  priority: AlertSeverityFilter
+  assignedAnalyst: StringFilter
+  summary: StringFilter
+  openDate: DateTimeFilter
+  closeDate: DateTimeFilter
+  AND: [CaseFilter!]
+  OR: [CaseFilter!]
+  NOT: CaseFilter
+}
+
+input CaseOrderBy {
+  id: SortDirection
+  caseNumber: SortDirection
+  status: SortDirection
+  priority: SortDirection
+  assignedAnalyst: SortDirection
+  summary: SortDirection
+  openDate: SortDirection
+  closeDate: SortDirection
+}
+
+type CaseChangeEvent {
+  changeType: ChangeType!
+  object: Case!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type SuspiciousActivityReport {
+  id: ID!
+  sarNumber: String
+  status: SarStatus
+  filingDate: DateTime
+  narrative: String
+  amount: Float
+  reportingEntity: String
+  caseRef: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type SuspiciousActivityReportConnection {
+  edges: [SuspiciousActivityReportEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type SuspiciousActivityReportEdge {
+  node: SuspiciousActivityReport!
+  cursor: String!
+}
+
+input SuspiciousActivityReportFilter {
+  id: IDFilter
+  sarNumber: StringFilter
+  status: SarStatusFilter
+  filingDate: DateTimeFilter
+  narrative: StringFilter
+  amount: FloatFilter
+  reportingEntity: StringFilter
+  caseRef: StringFilter
+  AND: [SuspiciousActivityReportFilter!]
+  OR: [SuspiciousActivityReportFilter!]
+  NOT: SuspiciousActivityReportFilter
+}
+
+input SuspiciousActivityReportOrderBy {
+  id: SortDirection
+  sarNumber: SortDirection
+  status: SortDirection
+  filingDate: SortDirection
+  narrative: SortDirection
+  amount: SortDirection
+  reportingEntity: SortDirection
+  caseRef: SortDirection
+}
+
+type SuspiciousActivityReportChangeEvent {
+  changeType: ChangeType!
+  object: SuspiciousActivityReport!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Patient {
+  id: ID!
+  nhsNumber: String
+  name: String
+  family: String
+  given: String
+  dateOfBirth: Date
+  status: PatientStatus
+  triageCategory: TriageCategory
+  presentingComplaint: String
+  currentWard: Ward
+  currentBed: Bed
+  admissions: [AdmittedTo!]
+  consultant: Consultant
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type PatientConnection {
+  edges: [PatientEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PatientEdge {
+  node: Patient!
+  cursor: String!
+}
+
+input PatientFilter {
+  id: IDFilter
+  nhsNumber: StringFilter
+  name: StringFilter
+  family: StringFilter
+  given: StringFilter
+  dateOfBirth: DateFilter
+  status: PatientStatusFilter
+  triageCategory: TriageCategoryFilter
+  presentingComplaint: StringFilter
+  AND: [PatientFilter!]
+  OR: [PatientFilter!]
+  NOT: PatientFilter
+}
+
+input PatientOrderBy {
+  id: SortDirection
+  nhsNumber: SortDirection
+  name: SortDirection
+  family: SortDirection
+  given: SortDirection
+  dateOfBirth: SortDirection
+  status: SortDirection
+  triageCategory: SortDirection
+  presentingComplaint: SortDirection
+}
+
+type PatientChangeEvent {
+  changeType: ChangeType!
+  object: Patient!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Ward {
+  id: ID!
+  name: String
+  specialty: String
+  capacity: Int
+  currentOccupancy: Int
+  patients: [Patient!]
+  beds: [Bed!]
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type WardConnection {
+  edges: [WardEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type WardEdge {
+  node: Ward!
+  cursor: String!
+}
+
+input WardFilter {
+  id: IDFilter
+  name: StringFilter
+  specialty: StringFilter
+  capacity: IntFilter
+  AND: [WardFilter!]
+  OR: [WardFilter!]
+  NOT: WardFilter
+}
+
+input WardOrderBy {
+  id: SortDirection
+  name: SortDirection
+  specialty: SortDirection
+  capacity: SortDirection
+}
+
+type WardChangeEvent {
+  changeType: ChangeType!
+  object: Ward!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Bed {
+  id: ID!
+  number: String
+  type: BedType
+  status: BedStatus
+  ward: Ward
+  patient: Patient
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type BedConnection {
+  edges: [BedEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type BedEdge {
+  node: Bed!
+  cursor: String!
+}
+
+input BedFilter {
+  id: IDFilter
+  number: StringFilter
+  type: BedTypeFilter
+  status: BedStatusFilter
+  AND: [BedFilter!]
+  OR: [BedFilter!]
+  NOT: BedFilter
+}
+
+input BedOrderBy {
+  id: SortDirection
+  number: SortDirection
+  type: SortDirection
+  status: SortDirection
+}
+
+type BedChangeEvent {
+  changeType: ChangeType!
+  object: Bed!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Consultant {
+  id: ID!
+  gmcNumber: String
+  name: String
+  specialty: String
+  patients: [Patient!]
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type ConsultantConnection {
+  edges: [ConsultantEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ConsultantEdge {
+  node: Consultant!
+  cursor: String!
+}
+
+input ConsultantFilter {
+  id: IDFilter
+  gmcNumber: StringFilter
+  name: StringFilter
+  specialty: StringFilter
+  AND: [ConsultantFilter!]
+  OR: [ConsultantFilter!]
+  NOT: ConsultantFilter
+}
+
+input ConsultantOrderBy {
+  id: SortDirection
+  gmcNumber: SortDirection
+  name: SortDirection
+  specialty: SortDirection
+}
+
+type ConsultantChangeEvent {
+  changeType: ChangeType!
+  object: Consultant!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Staff {
+  id: ID!
+  staffId: String
+  name: String
+  role: StaffRole
+  specialty: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type StaffConnection {
+  edges: [StaffEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type StaffEdge {
+  node: Staff!
+  cursor: String!
+}
+
+input StaffFilter {
+  id: IDFilter
+  staffId: StringFilter
+  name: StringFilter
+  role: StaffRoleFilter
+  specialty: StringFilter
+  AND: [StaffFilter!]
+  OR: [StaffFilter!]
+  NOT: StaffFilter
+}
+
+input StaffOrderBy {
+  id: SortDirection
+  staffId: SortDirection
+  name: SortDirection
+  role: SortDirection
+  specialty: SortDirection
+}
+
+type StaffChangeEvent {
+  changeType: ChangeType!
+  object: Staff!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type DischargeRecord {
+  id: ID!
+  patient: Patient
+  ward: Ward
+  destination: DischargeDestination
+  dischargeDate: DateTime
+  notes: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type DischargeRecordConnection {
+  edges: [DischargeRecordEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type DischargeRecordEdge {
+  node: DischargeRecord!
+  cursor: String!
+}
+
+input DischargeRecordFilter {
+  id: IDFilter
+  patient: PatientFilter
+  ward: WardFilter
+  destination: DischargeDestinationFilter
+  dischargeDate: DateTimeFilter
+  notes: StringFilter
+  AND: [DischargeRecordFilter!]
+  OR: [DischargeRecordFilter!]
+  NOT: DischargeRecordFilter
+}
+
+input DischargeRecordOrderBy {
+  id: SortDirection
+  patient: SortDirection
+  ward: SortDirection
+  destination: SortDirection
+  dischargeDate: SortDirection
+  notes: SortDirection
+}
+
+type DischargeRecordChangeEvent {
+  changeType: ChangeType!
+  object: DischargeRecord!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Transfer {
+  id: ID!
+  patient: Patient
+  fromWard: Ward
+  toWard: Ward
+  transferDate: DateTime
+  reason: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type TransferConnection {
+  edges: [TransferEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type TransferEdge {
+  node: Transfer!
+  cursor: String!
+}
+
+input TransferFilter {
+  id: IDFilter
+  patient: PatientFilter
+  fromWard: WardFilter
+  toWard: WardFilter
+  transferDate: DateTimeFilter
+  reason: StringFilter
+  AND: [TransferFilter!]
+  OR: [TransferFilter!]
+  NOT: TransferFilter
+}
+
+input TransferOrderBy {
+  id: SortDirection
+  patient: SortDirection
+  fromWard: SortDirection
+  toWard: SortDirection
+  transferDate: SortDirection
+  reason: SortDirection
+}
+
+type TransferChangeEvent {
+  changeType: ChangeType!
+  object: Transfer!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Supplier {
+  id: ID!
+  name: String
+  code: String
+  tier: SupplierTier
+  contactName: String
+  contactEmail: String
+  country: String
+  leadTimeDays: Int
+  onTimeDeliveryRate: Float
+  products: [Product!]
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type SupplierConnection {
+  edges: [SupplierEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type SupplierEdge {
+  node: Supplier!
+  cursor: String!
+}
+
+input SupplierFilter {
+  id: IDFilter
+  name: StringFilter
+  code: StringFilter
+  tier: SupplierTierFilter
+  contactName: StringFilter
+  contactEmail: StringFilter
+  country: StringFilter
+  leadTimeDays: IntFilter
+  onTimeDeliveryRate: FloatFilter
+  AND: [SupplierFilter!]
+  OR: [SupplierFilter!]
+  NOT: SupplierFilter
+}
+
+input SupplierOrderBy {
+  id: SortDirection
+  name: SortDirection
+  code: SortDirection
+  tier: SortDirection
+  contactName: SortDirection
+  contactEmail: SortDirection
+  country: SortDirection
+  leadTimeDays: SortDirection
+  onTimeDeliveryRate: SortDirection
+}
+
+type SupplierChangeEvent {
+  changeType: ChangeType!
+  object: Supplier!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Facility {
+  id: ID!
+  name: String
+  code: String
+  type: FacilityType
+  status: FacilityStatus
+  address: String
+  country: String
+  capacity: Int
+  currentUtilization: Int
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type FacilityConnection {
+  edges: [FacilityEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FacilityEdge {
+  node: Facility!
+  cursor: String!
+}
+
+input FacilityFilter {
+  id: IDFilter
+  name: StringFilter
+  code: StringFilter
+  type: FacilityTypeFilter
+  status: FacilityStatusFilter
+  address: StringFilter
+  country: StringFilter
+  capacity: IntFilter
+  AND: [FacilityFilter!]
+  OR: [FacilityFilter!]
+  NOT: FacilityFilter
+}
+
+input FacilityOrderBy {
+  id: SortDirection
+  name: SortDirection
+  code: SortDirection
+  type: SortDirection
+  status: SortDirection
+  address: SortDirection
+  country: SortDirection
+  capacity: SortDirection
+}
+
+type FacilityChangeEvent {
+  changeType: ChangeType!
+  object: Facility!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Product {
+  id: ID!
+  sku: String
+  name: String
+  category: String
+  unitOfMeasure: String
+  reorderPoint: Int
+  reorderQuantity: Int
+  suppliers: [Supplier!]
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type ProductConnection {
+  edges: [ProductEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductEdge {
+  node: Product!
+  cursor: String!
+}
+
+input ProductFilter {
+  id: IDFilter
+  sku: StringFilter
+  name: StringFilter
+  category: StringFilter
+  unitOfMeasure: StringFilter
+  reorderPoint: IntFilter
+  reorderQuantity: IntFilter
+  AND: [ProductFilter!]
+  OR: [ProductFilter!]
+  NOT: ProductFilter
+}
+
+input ProductOrderBy {
+  id: SortDirection
+  sku: SortDirection
+  name: SortDirection
+  category: SortDirection
+  unitOfMeasure: SortDirection
+  reorderPoint: SortDirection
+  reorderQuantity: SortDirection
+}
+
+type ProductChangeEvent {
+  changeType: ChangeType!
+  object: Product!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type PurchaseOrder {
+  id: ID!
+  orderNumber: String
+  status: OrderStatus
+  supplier: Supplier
+  product: Product
+  quantity: Int
+  unitCost: Float
+  currency: String
+  requestedDeliveryDate: DateTime
+  notes: String
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type PurchaseOrderConnection {
+  edges: [PurchaseOrderEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PurchaseOrderEdge {
+  node: PurchaseOrder!
+  cursor: String!
+}
+
+input PurchaseOrderFilter {
+  id: IDFilter
+  orderNumber: StringFilter
+  status: OrderStatusFilter
+  supplier: SupplierFilter
+  product: ProductFilter
+  quantity: IntFilter
+  unitCost: FloatFilter
+  currency: StringFilter
+  requestedDeliveryDate: DateTimeFilter
+  notes: StringFilter
+  AND: [PurchaseOrderFilter!]
+  OR: [PurchaseOrderFilter!]
+  NOT: PurchaseOrderFilter
+}
+
+input PurchaseOrderOrderBy {
+  id: SortDirection
+  orderNumber: SortDirection
+  status: SortDirection
+  supplier: SortDirection
+  product: SortDirection
+  quantity: SortDirection
+  unitCost: SortDirection
+  currency: SortDirection
+  requestedDeliveryDate: SortDirection
+  notes: SortDirection
+}
+
+type PurchaseOrderChangeEvent {
+  changeType: ChangeType!
+  object: PurchaseOrder!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type Shipment {
+  id: ID!
+  trackingNumber: String
+  status: ShipmentStatus
+  transportMode: TransportMode
+  quantity: Int
+  departureDate: DateTime
+  estimatedArrival: DateTime
+  actualArrival: DateTime
+  order: PurchaseOrder
+  origin: Facility
+  destination: Facility
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type ShipmentConnection {
+  edges: [ShipmentEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ShipmentEdge {
+  node: Shipment!
+  cursor: String!
+}
+
+input ShipmentFilter {
+  id: IDFilter
+  trackingNumber: StringFilter
+  status: ShipmentStatusFilter
+  transportMode: TransportModeFilter
+  quantity: IntFilter
+  departureDate: DateTimeFilter
+  estimatedArrival: DateTimeFilter
+  actualArrival: DateTimeFilter
+  order: PurchaseOrderFilter
+  origin: FacilityFilter
+  destination: FacilityFilter
+  AND: [ShipmentFilter!]
+  OR: [ShipmentFilter!]
+  NOT: ShipmentFilter
+}
+
+input ShipmentOrderBy {
+  id: SortDirection
+  trackingNumber: SortDirection
+  status: SortDirection
+  transportMode: SortDirection
+  quantity: SortDirection
+  departureDate: SortDirection
+  estimatedArrival: SortDirection
+  actualArrival: SortDirection
+  order: SortDirection
+  origin: SortDirection
+  destination: SortDirection
+}
+
+type ShipmentChangeEvent {
+  changeType: ChangeType!
+  object: Shipment!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type InventoryRecord {
+  id: ID!
+  quantity: Int
+  reservedQuantity: Int
+  stockLevel: StockLevel
+  lastCountDate: DateTime
+  product: Product
+  facility: Facility
+  _redactedFields: [String!]
+  _consentRestricted: Boolean
+}
+
+type InventoryRecordConnection {
+  edges: [InventoryRecordEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type InventoryRecordEdge {
+  node: InventoryRecord!
+  cursor: String!
+}
+
+input InventoryRecordFilter {
+  id: IDFilter
+  quantity: IntFilter
+  reservedQuantity: IntFilter
+  stockLevel: StockLevelFilter
+  lastCountDate: DateTimeFilter
+  product: ProductFilter
+  facility: FacilityFilter
+  AND: [InventoryRecordFilter!]
+  OR: [InventoryRecordFilter!]
+  NOT: InventoryRecordFilter
+}
+
+input InventoryRecordOrderBy {
+  id: SortDirection
+  quantity: SortDirection
+  reservedQuantity: SortDirection
+  stockLevel: SortDirection
+  lastCountDate: SortDirection
+  product: SortDirection
+  facility: SortDirection
+}
+
+type InventoryRecordChangeEvent {
+  changeType: ChangeType!
+  object: InventoryRecord!
+  previousValues: JSON
+  causedBy: ActionReference
+  timestamp: DateTime!
+}
+
+type AlertCase {
+  id: ID!
+  assignedDate: DateTime
+  assignedBy: String
+}
+
+type CustomerAccount {
+  id: ID!
+}
+
+type AccountTransaction {
+  id: ID!
+}
+
+type CounterpartyTransaction {
+  id: ID!
+}
+
+type TransactionAlert {
+  id: ID!
+}
+
+type AlertForCustomer {
+  id: ID!
+}
+
+type CaseReport {
+  id: ID!
+}
+
+type AdmittedTo {
+  id: ID!
+  admissionDate: DateTime
+  expectedDischarge: DateTime
+  reason: String
+}
+
+type OccupiesBed {
+  id: ID!
+  assignedAt: DateTime
+}
+
+type UnderCareOf {
+  id: ID!
+  assignedDate: DateTime
+  role: CareRole
+}
+
+type BedInWard {
+  id: ID!
+}
+
+type DischargedPatient {
+  id: ID!
+}
+
+type DischargedFromWard {
+  id: ID!
+}
+
+type SuppliesProduct {
+  id: ID!
+  leadTimeDays: Int
+  unitCost: Float
+  minOrderQuantity: Int
+  preferredSupplier: Boolean
+}
+
+type OrderedFrom {
+  id: ID!
+  orderedAt: DateTime
+}
+
+type ShipmentForOrder {
+  id: ID!
+  createdAt: DateTime
+}
+
+type ShipsFrom {
+  id: ID!
+}
+
+type ShipsTo {
+  id: ID!
+}
+
+type InventoryAt {
+  id: ID!
+}
+
+type InventoryOf {
+  id: ID!
+}
+
+input FlagTransactionInput {
+  transaction: ID!
+  customer: ID!
+  alertNumber: String!
+  severity: AlertSeverity!
+  ruleName: String!
+  score: Float
+  narrative: String
+}
+
+type FlagTransactionResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input OpenCaseInput {
+  caseNumber: String!
+  priority: AlertSeverity!
+  assignedAnalyst: String!
+  summary: String
+}
+
+type OpenCaseResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input AssignAlertToCaseInput {
+  alert: ID!
+  investigationCase: ID!
+}
+
+type AssignAlertToCaseResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input FreezeAccountInput {
+  account: ID!
+  reason: String!
+}
+
+type FreezeAccountResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input FileReportInput {
+  investigationCase: ID!
+  sarNumber: String!
+  narrative: String!
+  amount: Float!
+  reportingEntity: String!
+}
+
+type FileReportResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input SubmitReportInput {
+  sar: ID!
+  investigationCase: ID!
+}
+
+type SubmitReportResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input AdmitPatientInput {
+  patient: ID!
+  ward: ID!
+  bed: ID
+  consultant: ID!
+  reason: String
+}
+
+type AdmitPatientResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input DischargePatientInput {
+  patient: ID!
+  destination: DischargeDestination!
+  notes: String
+}
+
+type DischargePatientResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input TransferWardInput {
+  patient: ID!
+  toWard: ID!
+  toBed: ID
+  reason: String
+}
+
+type TransferWardResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input CleanBedInput {
+  bed: ID!
+}
+
+type CleanBedResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input RegisterPatientInput {
+  name: String!
+  dateOfBirth: Date!
+  nhsNumber: String
+  triageCategory: TriageCategory
+  presentingComplaint: String
+  consent: Boolean
+}
+
+type RegisterPatientResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input CreateOrderInput {
+  supplier: ID!
+  product: ID!
+  orderNumber: String!
+  quantity: Int!
+  unitCost: Float!
+  currency: String!
+  requestedDeliveryDate: DateTime!
+  notes: String
+}
+
+type CreateOrderResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input ShipOrderInput {
+  order: ID!
+  origin: ID!
+  destination: ID!
+  trackingNumber: String
+  transportMode: TransportMode!
+  estimatedArrival: DateTime!
+}
+
+type ShipOrderResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input ReceiveShipmentInput {
+  shipment: ID!
+  order: ID!
+  destination: ID!
+  product: ID
+  inventoryRecord: ID
+  receivedQuantity: Int!
+  stockLevel: StockLevel!
+}
+
+type ReceiveShipmentResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+input CancelOrderInput {
+  order: ID!
+  reason: String
+}
+
+type CancelOrderResult {
+  success: Boolean!
+  actionId: ID!
+  errors: [ActionError!]
+  affectedObjects: [AffectedObject!]
+}
+
+type SearchHit_Customer {
+  node: Customer!
+  score: Float!
+}
+
+type SearchResult_Customer {
+  hits: [SearchHit_Customer!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Account {
+  node: Account!
+  score: Float!
+}
+
+type SearchResult_Account {
+  hits: [SearchHit_Account!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Transaction {
+  node: Transaction!
+  score: Float!
+}
+
+type SearchResult_Transaction {
+  hits: [SearchHit_Transaction!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Alert {
+  node: Alert!
+  score: Float!
+}
+
+type SearchResult_Alert {
+  hits: [SearchHit_Alert!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Case {
+  node: Case!
+  score: Float!
+}
+
+type SearchResult_Case {
+  hits: [SearchHit_Case!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_SuspiciousActivityReport {
+  node: SuspiciousActivityReport!
+  score: Float!
+}
+
+type SearchResult_SuspiciousActivityReport {
+  hits: [SearchHit_SuspiciousActivityReport!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Patient {
+  node: Patient!
+  score: Float!
+}
+
+type SearchResult_Patient {
+  hits: [SearchHit_Patient!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Ward {
+  node: Ward!
+  score: Float!
+}
+
+type SearchResult_Ward {
+  hits: [SearchHit_Ward!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Bed {
+  node: Bed!
+  score: Float!
+}
+
+type SearchResult_Bed {
+  hits: [SearchHit_Bed!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Consultant {
+  node: Consultant!
+  score: Float!
+}
+
+type SearchResult_Consultant {
+  hits: [SearchHit_Consultant!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Staff {
+  node: Staff!
+  score: Float!
+}
+
+type SearchResult_Staff {
+  hits: [SearchHit_Staff!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_DischargeRecord {
+  node: DischargeRecord!
+  score: Float!
+}
+
+type SearchResult_DischargeRecord {
+  hits: [SearchHit_DischargeRecord!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Transfer {
+  node: Transfer!
+  score: Float!
+}
+
+type SearchResult_Transfer {
+  hits: [SearchHit_Transfer!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Supplier {
+  node: Supplier!
+  score: Float!
+}
+
+type SearchResult_Supplier {
+  hits: [SearchHit_Supplier!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Facility {
+  node: Facility!
+  score: Float!
+}
+
+type SearchResult_Facility {
+  hits: [SearchHit_Facility!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Product {
+  node: Product!
+  score: Float!
+}
+
+type SearchResult_Product {
+  hits: [SearchHit_Product!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_PurchaseOrder {
+  node: PurchaseOrder!
+  score: Float!
+}
+
+type SearchResult_PurchaseOrder {
+  hits: [SearchHit_PurchaseOrder!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_Shipment {
+  node: Shipment!
+  score: Float!
+}
+
+type SearchResult_Shipment {
+  hits: [SearchHit_Shipment!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+type SearchHit_InventoryRecord {
+  node: InventoryRecord!
+  score: Float!
+}
+
+type SearchResult_InventoryRecord {
+  hits: [SearchHit_InventoryRecord!]!
+  totalCount: Int!
+  hasNextPage: Boolean!
+}
+
+enum AggregateFunction {
+  COUNT
+  SUM
+  AVG
+  MIN
+  MAX
+}
+
+input AggregateFieldInput {
+  field: String!
+  fn: AggregateFunction!
+  alias: String
+}
+
+type AggregateGroup {
+  keys: JSON!
+  values: JSON!
+}
+
+type AggregateResult {
+  groups: [AggregateGroup!]!
+  totalGroups: Int!
+}
+
+type Query {
+  customer(id: ID!): Customer
+  customers(filter: CustomerFilter, orderBy: CustomerOrderBy, first: Int, after: String, last: Int, before: String): CustomerConnection!
+  customerAggregate(filter: CustomerFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchCustomers(query: String!, fields: [String!], filter: CustomerFilter, first: Int, after: String): SearchResult_Customer!
+  account(id: ID!): Account
+  accounts(filter: AccountFilter, orderBy: AccountOrderBy, first: Int, after: String, last: Int, before: String): AccountConnection!
+  accountAggregate(filter: AccountFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchAccounts(query: String!, fields: [String!], filter: AccountFilter, first: Int, after: String): SearchResult_Account!
+  transaction(id: ID!): Transaction
+  transactions(filter: TransactionFilter, orderBy: TransactionOrderBy, first: Int, after: String, last: Int, before: String): TransactionConnection!
+  transactionAggregate(filter: TransactionFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchTransactions(query: String!, fields: [String!], filter: TransactionFilter, first: Int, after: String): SearchResult_Transaction!
+  alert(id: ID!): Alert
+  alerts(filter: AlertFilter, orderBy: AlertOrderBy, first: Int, after: String, last: Int, before: String): AlertConnection!
+  alertAggregate(filter: AlertFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchAlerts(query: String!, fields: [String!], filter: AlertFilter, first: Int, after: String): SearchResult_Alert!
+  case(id: ID!): Case
+  cases(filter: CaseFilter, orderBy: CaseOrderBy, first: Int, after: String, last: Int, before: String): CaseConnection!
+  caseAggregate(filter: CaseFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchCases(query: String!, fields: [String!], filter: CaseFilter, first: Int, after: String): SearchResult_Case!
+  suspiciousActivityReport(id: ID!): SuspiciousActivityReport
+  suspiciousActivityReports(filter: SuspiciousActivityReportFilter, orderBy: SuspiciousActivityReportOrderBy, first: Int, after: String, last: Int, before: String): SuspiciousActivityReportConnection!
+  suspiciousActivityReportAggregate(filter: SuspiciousActivityReportFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchSuspiciousActivityReports(query: String!, fields: [String!], filter: SuspiciousActivityReportFilter, first: Int, after: String): SearchResult_SuspiciousActivityReport!
+  patient(id: ID!): Patient
+  patients(filter: PatientFilter, orderBy: PatientOrderBy, first: Int, after: String, last: Int, before: String): PatientConnection!
+  patientAggregate(filter: PatientFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchPatients(query: String!, fields: [String!], filter: PatientFilter, first: Int, after: String): SearchResult_Patient!
+  ward(id: ID!): Ward
+  wards(filter: WardFilter, orderBy: WardOrderBy, first: Int, after: String, last: Int, before: String): WardConnection!
+  wardAggregate(filter: WardFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchWards(query: String!, fields: [String!], filter: WardFilter, first: Int, after: String): SearchResult_Ward!
+  bed(id: ID!): Bed
+  beds(filter: BedFilter, orderBy: BedOrderBy, first: Int, after: String, last: Int, before: String): BedConnection!
+  bedAggregate(filter: BedFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchBeds(query: String!, fields: [String!], filter: BedFilter, first: Int, after: String): SearchResult_Bed!
+  consultant(id: ID!): Consultant
+  consultants(filter: ConsultantFilter, orderBy: ConsultantOrderBy, first: Int, after: String, last: Int, before: String): ConsultantConnection!
+  consultantAggregate(filter: ConsultantFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchConsultants(query: String!, fields: [String!], filter: ConsultantFilter, first: Int, after: String): SearchResult_Consultant!
+  staff(id: ID!): Staff
+  staffs(filter: StaffFilter, orderBy: StaffOrderBy, first: Int, after: String, last: Int, before: String): StaffConnection!
+  staffAggregate(filter: StaffFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchStaffs(query: String!, fields: [String!], filter: StaffFilter, first: Int, after: String): SearchResult_Staff!
+  dischargeRecord(id: ID!): DischargeRecord
+  dischargeRecords(filter: DischargeRecordFilter, orderBy: DischargeRecordOrderBy, first: Int, after: String, last: Int, before: String): DischargeRecordConnection!
+  dischargeRecordAggregate(filter: DischargeRecordFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchDischargeRecords(query: String!, fields: [String!], filter: DischargeRecordFilter, first: Int, after: String): SearchResult_DischargeRecord!
+  transfer(id: ID!): Transfer
+  transfers(filter: TransferFilter, orderBy: TransferOrderBy, first: Int, after: String, last: Int, before: String): TransferConnection!
+  transferAggregate(filter: TransferFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchTransfers(query: String!, fields: [String!], filter: TransferFilter, first: Int, after: String): SearchResult_Transfer!
+  supplier(id: ID!): Supplier
+  suppliers(filter: SupplierFilter, orderBy: SupplierOrderBy, first: Int, after: String, last: Int, before: String): SupplierConnection!
+  supplierAggregate(filter: SupplierFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchSuppliers(query: String!, fields: [String!], filter: SupplierFilter, first: Int, after: String): SearchResult_Supplier!
+  facility(id: ID!): Facility
+  facilitys(filter: FacilityFilter, orderBy: FacilityOrderBy, first: Int, after: String, last: Int, before: String): FacilityConnection!
+  facilityAggregate(filter: FacilityFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchFacilitys(query: String!, fields: [String!], filter: FacilityFilter, first: Int, after: String): SearchResult_Facility!
+  product(id: ID!): Product
+  products(filter: ProductFilter, orderBy: ProductOrderBy, first: Int, after: String, last: Int, before: String): ProductConnection!
+  productAggregate(filter: ProductFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchProducts(query: String!, fields: [String!], filter: ProductFilter, first: Int, after: String): SearchResult_Product!
+  purchaseOrder(id: ID!): PurchaseOrder
+  purchaseOrders(filter: PurchaseOrderFilter, orderBy: PurchaseOrderOrderBy, first: Int, after: String, last: Int, before: String): PurchaseOrderConnection!
+  purchaseOrderAggregate(filter: PurchaseOrderFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchPurchaseOrders(query: String!, fields: [String!], filter: PurchaseOrderFilter, first: Int, after: String): SearchResult_PurchaseOrder!
+  shipment(id: ID!): Shipment
+  shipments(filter: ShipmentFilter, orderBy: ShipmentOrderBy, first: Int, after: String, last: Int, before: String): ShipmentConnection!
+  shipmentAggregate(filter: ShipmentFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchShipments(query: String!, fields: [String!], filter: ShipmentFilter, first: Int, after: String): SearchResult_Shipment!
+  inventoryRecord(id: ID!): InventoryRecord
+  inventoryRecords(filter: InventoryRecordFilter, orderBy: InventoryRecordOrderBy, first: Int, after: String, last: Int, before: String): InventoryRecordConnection!
+  inventoryRecordAggregate(filter: InventoryRecordFilter, groupBy: [String!], fields: [AggregateFieldInput!]!): AggregateResult!
+  searchInventoryRecords(query: String!, fields: [String!], filter: InventoryRecordFilter, first: Int, after: String): SearchResult_InventoryRecord!
+  availableTools(filter: ToolFilter): [ToolDescriptor!]!
+  objectSet(id: ID!): ObjectSet
+  objectSets(objectType: String): [ObjectSet!]!
+  cdmMetadata: JSON!
+  cdmRecord(sourceType: String!, id: ID!): JSON
+  cdmRecords(sourceType: String!): JSON!
+  cdmEncounters(patient: ID!): JSON!
+}
+
+type Mutation {
+  flagTransaction(input: FlagTransactionInput!): FlagTransactionResult!
+  openCase(input: OpenCaseInput!): OpenCaseResult!
+  assignAlertToCase(input: AssignAlertToCaseInput!): AssignAlertToCaseResult!
+  freezeAccount(input: FreezeAccountInput!): FreezeAccountResult!
+  fileReport(input: FileReportInput!): FileReportResult!
+  submitReport(input: SubmitReportInput!): SubmitReportResult!
+  admitPatient(input: AdmitPatientInput!): AdmitPatientResult!
+  dischargePatient(input: DischargePatientInput!): DischargePatientResult!
+  transferWard(input: TransferWardInput!): TransferWardResult!
+  cleanBed(input: CleanBedInput!): CleanBedResult!
+  registerPatient(input: RegisterPatientInput!): RegisterPatientResult!
+  createOrder(input: CreateOrderInput!): CreateOrderResult!
+  shipOrder(input: ShipOrderInput!): ShipOrderResult!
+  receiveShipment(input: ReceiveShipmentInput!): ReceiveShipmentResult!
+  cancelOrder(input: CancelOrderInput!): CancelOrderResult!
+  createObjectSet(input: CreateObjectSetInput!): ObjectSet!
+  updateObjectSet(id: ID!, input: UpdateObjectSetInput!): ObjectSet!
+  deleteObjectSet(id: ID!): Boolean!
+  grantRelationship(input: RelationshipInput!): RelationshipResult!
+  revokeRelationship(input: RelationshipInput!): RelationshipResult!
+  recordConsent(input: ConsentInput!): ConsentResult!
+}
+
+type Subscription {
+  customerChanged(id: ID!): CustomerChangeEvent!
+  customersChanged(filter: JSON): CustomerChangeEvent!
+  accountChanged(id: ID!): AccountChangeEvent!
+  accountsChanged(filter: JSON): AccountChangeEvent!
+  transactionChanged(id: ID!): TransactionChangeEvent!
+  transactionsChanged(filter: JSON): TransactionChangeEvent!
+  alertChanged(id: ID!): AlertChangeEvent!
+  alertsChanged(filter: JSON): AlertChangeEvent!
+  caseChanged(id: ID!): CaseChangeEvent!
+  casesChanged(filter: JSON): CaseChangeEvent!
+  suspiciousActivityReportChanged(id: ID!): SuspiciousActivityReportChangeEvent!
+  suspiciousActivityReportsChanged(filter: JSON): SuspiciousActivityReportChangeEvent!
+  patientChanged(id: ID!): PatientChangeEvent!
+  patientsChanged(filter: JSON): PatientChangeEvent!
+  wardChanged(id: ID!): WardChangeEvent!
+  wardsChanged(filter: JSON): WardChangeEvent!
+  bedChanged(id: ID!): BedChangeEvent!
+  bedsChanged(filter: JSON): BedChangeEvent!
+  consultantChanged(id: ID!): ConsultantChangeEvent!
+  consultantsChanged(filter: JSON): ConsultantChangeEvent!
+  staffChanged(id: ID!): StaffChangeEvent!
+  staffsChanged(filter: JSON): StaffChangeEvent!
+  dischargeRecordChanged(id: ID!): DischargeRecordChangeEvent!
+  dischargeRecordsChanged(filter: JSON): DischargeRecordChangeEvent!
+  transferChanged(id: ID!): TransferChangeEvent!
+  transfersChanged(filter: JSON): TransferChangeEvent!
+  supplierChanged(id: ID!): SupplierChangeEvent!
+  suppliersChanged(filter: JSON): SupplierChangeEvent!
+  facilityChanged(id: ID!): FacilityChangeEvent!
+  facilitysChanged(filter: JSON): FacilityChangeEvent!
+  productChanged(id: ID!): ProductChangeEvent!
+  productsChanged(filter: JSON): ProductChangeEvent!
+  purchaseOrderChanged(id: ID!): PurchaseOrderChangeEvent!
+  purchaseOrdersChanged(filter: JSON): PurchaseOrderChangeEvent!
+  shipmentChanged(id: ID!): ShipmentChangeEvent!
+  shipmentsChanged(filter: JSON): ShipmentChangeEvent!
+  inventoryRecordChanged(id: ID!): InventoryRecordChangeEvent!
+  inventoryRecordsChanged(filter: JSON): InventoryRecordChangeEvent!
+}
