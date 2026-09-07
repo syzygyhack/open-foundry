@@ -31,7 +31,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { GraphQLError } from 'graphql';
-import { expressMiddleware } from '@as-integrations/express4';
+import { expressMiddleware } from '@as-integrations/express5';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { MemoryStorageProvider } from '@openfoundry/storage-memory';
 import { PostgresStorageProvider, PostgresAuditStore, PostgresConsentStore, PostgresSchemaRegistry, PostgresObjectSetStore } from '@openfoundry/storage-postgres';
@@ -1038,7 +1038,7 @@ async function main(): Promise<void> {
   app.get('/api/v1/cdm/metadata', cdmMetadataHandler);
   app.head('/api/v1/cdm/metadata', cdmMetadataHandler);
   // Authenticated data projections.
-  app.all('/api/v1/cdm/*', async (req, res) => {
+  app.all('/api/v1/cdm/*splat', async (req, res) => {
     try {
       authorizationService.clearFieldCache();
       const user = await extractUser(req, authenticator, isDev);
@@ -1084,7 +1084,7 @@ async function main(): Promise<void> {
     logger.warn('WARNING: FHIR_BASE_URL not set — Bundle fullUrl links will use http://localhost. Set FHIR_BASE_URL to the externally routable address.');
   }
   const fhirHandler = createFhirRouter({ deps, baseUrl: fhirBaseUrl });
-  app.all('/fhir/*', async (req, res) => {
+  app.all('/fhir/*splat', async (req, res) => {
     try {
       authorizationService.clearFieldCache();
       const user = await extractUser(req, authenticator, isDev);
