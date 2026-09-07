@@ -26,9 +26,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /cel-evaluator .
 RUN mkdir -p /tools && cd /tools \
     && go mod init tools \
     && GOFLAGS=-mod=mod go get github.com/grpc-ecosystem/grpc-health-probe@v0.4.53 \
-    && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.83.1 \
-    && GOFLAGS=-mod=mod go get golang.org/x/text@v0.39.0 \
-    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.56.0 \
+    && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.83.2 \
+    && GOFLAGS=-mod=mod go get golang.org/x/text@v0.41.0 \
+    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.58.0 \
     && GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
 
