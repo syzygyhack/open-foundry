@@ -1,5 +1,5 @@
 {{/*
-Scrapes prom-client metrics from GET /metrics on the api-gateway.
+Scrapes Prometheus client metrics from GET /metrics on the api-gateway.
 See values.yaml monitoring.serviceMonitor.enabled (default: false).
 */}}
 {{- if .Values.monitoring.serviceMonitor.enabled }}

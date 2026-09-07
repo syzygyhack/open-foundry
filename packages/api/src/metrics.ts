@@ -13,7 +13,7 @@
  *   startStorageHealthGauge(storage);
  */
 
-import { Counter, Histogram, Gauge, register, collectDefaultMetrics } from 'prom-client';
+import { Counter, Histogram, Gauge, register, collectDefaultMetrics } from '@prometheus-io/client';
 import type { Request, Response, NextFunction } from 'express';
 import type { StorageProvider } from '@openfoundry/spi';
 

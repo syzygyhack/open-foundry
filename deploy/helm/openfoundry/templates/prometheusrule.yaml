@@ -1,7 +1,7 @@
 {{/*
 HighErrorRate, HighLatency, and StorageUnhealthy alerts reference application-level
 metrics (http_requests_total, http_request_duration_seconds_bucket,
-openfoundry_storage_healthy) exposed by prom-client on GET /metrics.
+openfoundry_storage_healthy) exposed by the Prometheus client on GET /metrics.
 PodRestarting uses kube-state-metrics (available out of the box).
 See values.yaml monitoring.prometheusRules.enabled (default: false).
 */}}
