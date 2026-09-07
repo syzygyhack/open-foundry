@@ -28,7 +28,7 @@
     "pg": "^8.23.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
     "vitest": "^3.2.7"
   }

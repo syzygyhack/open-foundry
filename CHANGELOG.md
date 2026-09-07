@@ -10,6 +10,11 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- Raised the supported Node.js runtime from the end-of-life Node 20 line to
+  Node 24 LTS across development, CI, and service images.
+
 ## [0.2.4] - 2026-09-07
 
 ### Security
