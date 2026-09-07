@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@openfoundry/spi": "workspace:*",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.4.1",
     "vitest": "^5.0.0"
   }
 }
