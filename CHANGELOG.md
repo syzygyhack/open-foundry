@@ -28,14 +28,16 @@ are called out under **Breaking changes**.
   major versions, with the corresponding server import and iterator APIs.
 - Followed the official Prometheus JavaScript client package rename from
   `prom-client` to `@prometheus-io/client`.
+- Added Redis connection-health and fail-open metrics, throttled repeated outage
+  warnings, and pinned the Compose service to Redis 7.4.11.
 - Updated CEL-Go through its final non-breaking release before the upstream
   module-path migration, including evaluator safety and performance fixes.
 - Updated the TypeScript compiler, Vitest runner, and ODL CLI framework to their
   supported majors, and applied current JOSE and GraphQL schema patches.
 - Expanded the npm dependency queue so independent major-version reviews do not
   prevent grouped routine updates from opening.
-- CI now rejects generated API contracts that have drifted from their source,
-  and the release checklist explicitly regenerates them after version changes.
+- Generated API contracts are now tracked for review; CI rejects drift from
+  their source and the release checklist regenerates them after version changes.
 
 ## [0.2.4] - 2026-09-07
 

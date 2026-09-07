@@ -8,9 +8,12 @@
  * was recorded, added=0 means it was denied (check-then-add pattern).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RedisRateLimiter } from '../governance/redis-rate-limiter.js';
+import { EventEmitter } from 'node:events';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { RedisRateLimiter, monitorRedisRateLimiterConnection } from '../governance/redis-rate-limiter.js';
 import type { Redis } from 'ioredis';
+import { logger } from '../logger.js';
+import { rateLimiterFailOpenTotal, rateLimiterRedisUp } from '../metrics.js';
 
 /** Lua result: [count after action, 1=added 0=denied] */
 type LuaResult = [number, number];
@@ -34,6 +37,8 @@ describe('RedisRateLimiter', () => {
   let limiter: RedisRateLimiter;
 
   beforeEach(() => {
+    rateLimiterFailOpenTotal.reset();
+    rateLimiterRedisUp.reset();
     redis = createMockRedis();
     redis._evalResults = [];
     (redis as unknown as { _evalCallIndex: number })._evalCallIndex = 0;
@@ -43,6 +48,11 @@ describe('RedisRateLimiter', () => {
         principal: { windowMs: 60_000, maxRequests: 3 },
       },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('allows requests when counts are within limits', async () => {
@@ -96,6 +106,53 @@ describe('RedisRateLimiter', () => {
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(0);
+    expect((await rateLimiterFailOpenTotal.get()).values[0]?.value).toBe(1);
+  });
+
+  it('counts every fail-open decision but throttles warnings', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    (redis.eval as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('ECONNREFUSED'));
+
+    const identity = { tenantId: 'tenant-1', principalId: 'user-1' };
+    await limiter.check(identity);
+    await limiter.check(identity);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect((await rateLimiterFailOpenTotal.get()).values[0]?.value).toBe(2);
+
+    vi.advanceTimersByTime(60_000);
+    await limiter.check(identity);
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect((await rateLimiterFailOpenTotal.get()).values[0]?.value).toBe(3);
+  });
+
+  it('tracks Redis connection state and throttles connection errors', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const events = new EventEmitter();
+
+    monitorRedisRateLimiterConnection(events as unknown as Redis);
+    expect((await rateLimiterRedisUp.get()).values[0]?.value).toBe(0);
+
+    events.emit('ready');
+    expect(info).toHaveBeenCalledOnce();
+    expect((await rateLimiterRedisUp.get()).values[0]?.value).toBe(1);
+
+    events.emit('close');
+    expect((await rateLimiterRedisUp.get()).values[0]?.value).toBe(0);
+
+    events.emit('error', new Error('ECONNREFUSED'));
+    events.emit('error', new Error('ECONNREFUSED'));
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(60_000);
+    events.emit('error', new Error('ECONNREFUSED'));
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 
   it('includes clientApp dimension when clientAppId is provided', async () => {
