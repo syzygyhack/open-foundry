@@ -2,10 +2,10 @@ apiVersion: v2
 name: openfoundry
 description: Open Foundry — an ontology platform for operational digital twins
 type: application
-# Chart version tracks the platform release it deploys; both are set by the
-# release workflow so a chart can never advertise a version it does not deploy.
-version: 0.2.3
-appVersion: "0.2.3"
+# Chart version tracks the platform release it deploys; the release commit sets
+# both, and the release workflow refuses to publish if they drift.
+version: 0.2.4
+appVersion: "0.2.4"
 keywords:
   - openfoundry
   - ontology
