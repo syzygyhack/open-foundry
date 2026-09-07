@@ -10,6 +10,37 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-07
+
+### Security
+
+- Cleared the current production dependency advisories: denial-of-service
+  flaws in `qs` and `protobufjs`, and a `body-parser` flaw that could disable
+  request-size enforcement when given an invalid limit.
+
+### Changed
+
+- Upgraded to ioredis 6 while retaining RESP2 for Redis-compatible proxies and
+  preserving the rate limiter's fast, fail-open behaviour during initial
+  connection, reconnects, and outages.
+- Aligned the shared logger on Pino 10 and the OpenTelemetry runtime and test
+  packages on one coordinated release family.
+- Moved the CEL evaluator build to the patched Go 1.27 toolchain while retaining
+  Go 1.25 language compatibility, and refreshed the supported Node.js tooling.
+- Grouped future OpenTelemetry updates together so runtime and test packages do
+  not drift across coordinated upstream releases.
+
+### Release process
+
+- Releases now require successful `main`-branch CI for the exact tagged commit
+  and reject tags that disagree with checked-in package, chart, image,
+  changelog, or install-example versions. Release packaging no longer rewrites
+  source metadata after checkout, and verifies the generated API contract
+  versions before publishing.
+- Corrected the API contract documentation: released specs use the platform
+  version and the release job relies on the exact-SHA CI gate rather than
+  rerunning only a subset of tests.
+
 ## [0.2.3] - 2026-08-28
 
 ### Security
@@ -192,7 +223,8 @@ in-memory providers, ontology engine, action framework, security layer
 (OIDC/OpenFGA/consent/audit), sync engine, GraphQL/REST/FHIR APIs, Helm chart,
 and the NHS Acute, AML, and Supply Chain domain packs.
 
-[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/syzygyhack/open-foundry/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/syzygyhack/open-foundry/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/syzygyhack/open-foundry/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/syzygyhack/open-foundry/compare/v0.2.0...v0.2.1
