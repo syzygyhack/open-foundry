@@ -10,6 +10,8 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-07
+
 ### Breaking changes
 
 - Raised the supported Node.js runtime from the end-of-life Node 20 line to
@@ -257,7 +259,8 @@ in-memory providers, ontology engine, action framework, security layer
 (OIDC/OpenFGA/consent/audit), sync engine, GraphQL/REST/FHIR APIs, Helm chart,
 and the NHS Acute, AML, and Supply Chain domain packs.
 
-[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/syzygyhack/open-foundry/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/syzygyhack/open-foundry/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/syzygyhack/open-foundry/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/syzygyhack/open-foundry/compare/v0.2.1...v0.2.2
