@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Open Foundry API
-  version: 0.2.4
+  version: 0.3.0
   description: Auto-generated REST API for the Open Foundry ontology platform.
   license:
     name: Apache-2.0

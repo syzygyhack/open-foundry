@@ -187,7 +187,7 @@ does not have to build from source:
 ```bash
 # Images: ghcr.io/syzygyhack/open-foundry/<service>:<version>
 helm install openfoundry \
-  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.2.4
+  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.3.0
 ```
 
 The chart's `version` and `appVersion` always match the platform release it
