@@ -15,6 +15,28 @@ are called out under **Breaking changes**.
 - Raised the supported Node.js runtime from the end-of-life Node 20 line to
   Node 24 LTS across development, CI, and service images.
 
+### Security
+
+- Updated the CEL service and its health probe to gRPC-Go 1.83.2 so requests
+  missing both authority headers are rejected rather than accepted.
+
+### Changed
+
+- Migrated the API gateway and Apollo middleware to Express 5, including the
+  named wildcard routes required by its path matcher.
+- Updated the GraphQL WebSocket and subscription libraries to their supported
+  major versions, with the corresponding server import and iterator APIs.
+- Followed the official Prometheus JavaScript client package rename from
+  `prom-client` to `@prometheus-io/client`.
+- Updated CEL-Go through its final non-breaking release before the upstream
+  module-path migration, including evaluator safety and performance fixes.
+- Updated the TypeScript compiler, Vitest runner, and ODL CLI framework to their
+  supported majors, and applied current JOSE and GraphQL schema patches.
+- Expanded the npm dependency queue so independent major-version reviews do not
+  prevent grouped routine updates from opening.
+- CI now rejects generated API contracts that have drifted from their source,
+  and the release checklist explicitly regenerates them after version changes.
+
 ## [0.2.4] - 2026-09-07
 
 ### Security
