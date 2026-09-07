@@ -92,6 +92,32 @@ Conventional-commit style: `fix(api):`, `feat(odl):`, `docs(packs):`,
 `test(integration):`, `chore(deps):`. Please don't add `Co-Authored-By` or other
 attribution trailers.
 
+## Cutting a release (maintainers)
+
+1. Choose the next version using SemVer. Before 1.0, breaking changes require a
+   minor release; compatible fixes and dependency maintenance use a patch.
+2. In one `chore(release): X.Y.Z` commit, move the relevant changelog entries
+   out of `Unreleased` and align the version in `package.json`, the chart
+   `version`/`appVersion`, the default chart image tag, and the install example
+   in `deploy/README.md`.
+3. Land that commit on `main`, then verify the full CI workflow succeeded for
+   its exact SHA. Do not infer this from the latest run:
+
+   ```bash
+   sha=$(git rev-parse HEAD)
+   gh run list --workflow CI --commit "$sha" --branch main --event push \
+     --json databaseId,headSha,status,conclusion
+   ```
+
+4. Create an annotated `vX.Y.Z` tag on that verified commit and push only the
+   tag. The release workflow repeats the exact-SHA CI check before publishing.
+
+The workflow refuses tags whose commit is not on `main` or whose tag, package,
+chart, image default, changelog, and install example disagree. It then builds
+the release assets from the checked-in version, verifies that the generated
+OpenAPI and AsyncAPI contracts advertise that version, creates a draft, attests
+the artifacts, and makes the release visible only after provenance succeeds.
+
 ## Reporting bugs
 
 Open an issue using the template. The three fields that most often decide whether

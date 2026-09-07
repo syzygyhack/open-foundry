@@ -95,11 +95,11 @@ npx @asyncapi/generator asyncapi.yaml @asyncapi/typescript-template -o ./generat
 
 ## Versioning
 
-Spec artifacts follow their own semver track, independent of the platform version.
-See the SDK plan (`.avril/plan/plan-sdk.md`) for the full versioning policy.
-
-**Compatibility contract**: SDK `1.x` works against any spec `1.x` deployment.
-A spec major bump (2.0) requires SDK upgrades.
+Released spec metadata is stamped with the platform version from the root
+`package.json`; it does not have an independent version track. API compatibility
+therefore follows the platform's SemVer policy. While the platform is pre-1.0,
+breaking contract changes require a minor release and compatible fixes use a
+patch release.
 
 ## Validation
 
@@ -117,11 +117,22 @@ Run the validation:
 pnpm --filter @openfoundry/api test spec-roundtrip
 ```
 
-## CI Release Workflow
+## Release Workflow
 
 The `.github/workflows/release.yml` workflow runs on every `v*` tag push:
 
-1. Install dependencies and build
-2. Run tests
-3. Generate spec artifacts via `spec:all`
-4. Upload `openapi.yaml`, `schema.graphql`, and `asyncapi.yaml` to the GitHub release
+1. Require the full `CI` workflow to have succeeded for the exact tagged commit
+   as a `main` branch push.
+2. Verify the tag, package, Helm chart, default image tag, changelog, and install
+   example all name the same version, and that the commit remains on `main`.
+3. Install frozen dependencies, build, and generate the API contracts via
+   `spec:all`.
+4. Build and push the service images and versioned Helm chart, then generate the
+   image-digest list and CycloneDX SBOM.
+5. Attach the contracts, chart, digests, and SBOM to a draft GitHub release,
+   attest their provenance, and only then publish the release.
+
+Tests are not rerun in the release job; the exact-SHA CI gate is authoritative
+and includes the complete test, integration, Helm, image-build, and security
+matrix. The maintainer checklist is in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md#cutting-a-release-maintainers).

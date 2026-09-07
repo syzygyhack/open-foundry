@@ -28,6 +28,9 @@ jobs:
   verify:
     name: Require full CI green for the tagged commit
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Wait for CI on this commit
         env:
@@ -39,11 +42,12 @@ jobs:
           # Tags are usually pushed at a commit CI has already run on; allow time
           # for the run to appear and finish if the tag raced the push.
           for attempt in $(seq 1 60); do
-            run=$(gh run list --repo "$REPO" --workflow=CI --limit 30 \
-                    --json databaseId,headSha,status,conclusion \
-                    --jq "[.[] | select(.headSha == \"$SHA\")] | first // empty")
+            run=$(gh run list --repo "$REPO" --workflow=CI --commit "$SHA" \
+                    --branch main --event push --limit 5 \
+                    --json databaseId,headSha,headBranch,event,status,conclusion \
+                    --jq "[.[] | select(.headSha == \"$SHA\" and .headBranch == \"main\" and .event == \"push\")] | first // empty")
             if [ -z "$run" ]; then
-              echo "attempt $attempt: no CI run for $SHA yet"
+              echo "attempt $attempt: no main-branch CI run for $SHA yet"
             else
               status=$(echo "$run" | jq -r .status)
               conclusion=$(echo "$run" | jq -r '.conclusion // ""')
@@ -76,12 +80,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Required by the origin/main ancestry check below.
+          fetch-depth: 0
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
           cache: 'pnpm'
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      # Validate the checked-in release state rather than silently rewriting it.
+      # This keeps source, specs, images and the chart on one version and makes
+      # a tag on an unmerged commit fail closed.
+      - name: Validate release metadata
+        id: ver
+        run: |
+          set -euo pipefail
+          package_version=$(node -p "require('./package.json').version")
+          chart_version=$(sed -n 's/^version: *//p' deploy/helm/openfoundry/Chart.yaml)
+          app_version=$(sed -n 's/^appVersion: *"\([^"]*\)"/\1/p' deploy/helm/openfoundry/Chart.yaml)
+          image_tag=$(sed -n '/^image:$/,/^[^ ]/s/^  tag: *"\([^"]*\)"/\1/p' deploy/helm/openfoundry/values.yaml)
+          expected_tag="v${package_version}"
+
+          if [ "$GITHUB_REF_NAME" != "$expected_tag" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match package version $package_version."
+            exit 1
+          fi
+          if [ "$chart_version" != "$package_version" ] || \
+             [ "$app_version" != "$package_version" ] || \
+             [ "$image_tag" != "$package_version" ]; then
+            echo "::error::Package, chart, appVersion and default image tag must all equal $package_version."
+            exit 1
+          fi
+          if ! grep -Fq "## [$package_version] - " CHANGELOG.md || \
+             ! grep -Fq -- "--version $package_version" deploy/README.md; then
+            echo "::error::CHANGELOG.md and the install example must name release $package_version."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tagged commit $GITHUB_SHA is not reachable from origin/main."
+            exit 1
+          fi
+
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "Release metadata is aligned at $package_version."
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -92,12 +135,23 @@ jobs:
       - name: Generate spec artifacts
         run: pnpm --filter @openfoundry/api spec:all
 
-      # Images and the chart are what people actually install. Without them a
-      # release is only source plus contracts, and a version-to-version upgrade
-      # cannot be tested reproducibly.
-      - name: Derive release version
-        id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Validate generated spec versions
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          pnpm --filter @openfoundry/api exec node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { parse } from 'yaml';
+
+          const expected = process.env.VERSION;
+          for (const file of ['spec/openapi.yaml', 'spec/asyncapi.yaml']) {
+            const actual = parse(readFileSync(file, 'utf8')).info?.version;
+            if (actual !== expected) {
+              throw new Error(`${file} info.version is ${actual ?? '<missing>'}; expected ${expected}`);
+            }
+            console.log(`${file}: ${actual}`);
+          }
+          NODE
 
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -134,17 +188,11 @@ jobs:
           cel-evaluator cel-evaluator
           SERVICES
 
-      - name: Package Helm chart at the release version
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
+      - name: Package Helm chart
         run: |
           set -euo pipefail
-          # The chart must advertise exactly the version it deploys.
-          sed -i "s/^version: .*/version: ${VERSION}/; s/^appVersion: .*/appVersion: \"${VERSION}\"/" \
-            deploy/helm/openfoundry/Chart.yaml
-          sed -i "s/^  tag: \".*\"/  tag: \"${VERSION}\"/" deploy/helm/openfoundry/values.yaml
           helm package deploy/helm/openfoundry --destination .
-          helm push "openfoundry-${VERSION}.tgz" "oci://ghcr.io/${{ github.repository }}/charts"
+          helm push "openfoundry-${{ steps.ver.outputs.version }}.tgz" "oci://ghcr.io/${{ github.repository }}/charts"
 
       - name: Install trivy (checksum verified)
         env:
