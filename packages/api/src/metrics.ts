@@ -1,10 +1,12 @@
 /**
  * Prometheus metrics for the API gateway (Section 13.3).
  *
- * Exposes three metrics expected by the Helm PrometheusRule:
+ * Exposes application and dependency-health metrics:
  *   - http_requests_total         (Counter)
  *   - http_request_duration_seconds (Histogram)
  *   - openfoundry_storage_healthy   (Gauge)
+ *   - openfoundry_rate_limiter_redis_up (Gauge)
+ *   - openfoundry_rate_limiter_fail_open_total (Counter)
  *
  * Usage:
  *   import { metricsMiddleware, metricsEndpoint, startStorageHealthGauge } from './metrics.js';
@@ -44,6 +46,16 @@ export const packLoaded = new Gauge({
   name: 'openfoundry_pack_loaded',
   help: 'Domain pack loaded: 1 = loaded',
   labelNames: ['name', 'version', 'origin'] as const,
+});
+
+export const rateLimiterRedisUp = new Gauge({
+  name: 'openfoundry_rate_limiter_redis_up',
+  help: 'Redis rate limiter connection state: 1 = ready, 0 = unavailable',
+});
+
+export const rateLimiterFailOpenTotal = new Counter({
+  name: 'openfoundry_rate_limiter_fail_open_total',
+  help: 'Rate limit checks allowed because the Redis command failed',
 });
 
 // ─── Middleware ───

@@ -105,12 +105,14 @@ The client deliberately disables its offline command queue and uses short
 timeouts because rate limiting is a quality-of-service control, not an access
 control boundary. Requests that arrive during the initial Redis connection,
 while Redis is reconnecting, or during an outage are therefore allowed rather
-than delayed or rejected. Each affected request emits a
-`RedisRateLimiter Redis error, failing open` warning.
+than delayed or rejected. Each affected rate-limit check increments
+`openfoundry_rate_limiter_fail_open_total`; repeated request-path warnings are
+throttled to once per minute per limiter. Connection errors are also logged at
+most once per minute, including when no requests are arriving.
 
-Monitor that warning and Redis availability if distributed limits are an
-operational requirement. Authorization and other security controls do not rely
-on this fail-open path.
+Monitor those warnings and `openfoundry_rate_limiter_redis_up` (1 when ready, 0
+when unavailable) if distributed limits are an operational requirement.
+Authorization and other security controls do not rely on this fail-open path.
 
 ### Schema-checksum drift on re-deploy with persisted volumes
 

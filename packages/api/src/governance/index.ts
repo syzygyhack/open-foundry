@@ -13,7 +13,7 @@ export {
   type RateLimitIdentity,
   type RateLimitResult,
 } from './rate-limiter.js';
-export { RedisRateLimiter, type RedisRateLimiterConfig } from './redis-rate-limiter.js';
+export { RedisRateLimiter, monitorRedisRateLimiterConnection, type RedisRateLimiterConfig } from './redis-rate-limiter.js';
 
 export {
   QueryComplexityAnalyzer,

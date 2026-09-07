@@ -72,7 +72,7 @@ import { loadDomainPacks } from './schema-loader.js';
 import { generateOpenFGASchema, mergeOpenFGAOverrides, actionPermissionRelation, InMemorySchemaRegistry } from '@openfoundry/odl';
 import type { SchemaRegistry } from '@openfoundry/odl';
 import { recordSchemaVersion } from './schema-registry-boot.js';
-import { SlidingWindowRateLimiter, RedisRateLimiter } from './governance/index.js';
+import { SlidingWindowRateLimiter, RedisRateLimiter, monitorRedisRateLimiterConnection } from './governance/index.js';
 import type { RateLimiter, RateLimitIdentity } from './governance/index.js';
 import { toSnakeCase } from './utils.js';
 import { metricsMiddleware, metricsEndpoint, startStorageHealthGauge, packLoaded } from './metrics.js';
@@ -145,6 +145,7 @@ async function main(): Promise<void> {
       connectTimeout: 3_000,
       commandTimeout: 1_000,
     });
+    monitorRedisRateLimiterConnection(redisClient);
     rateLimiter = new RedisRateLimiter(redisClient);
     logger.info(`Rate limiter: Redis @ ${redisUrl.replace(/\/\/.*@/, '//<redacted>@')}`);
   } else {

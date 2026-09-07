@@ -16,6 +16,7 @@ import crypto from 'node:crypto';
 import type { Redis } from 'ioredis';
 import type { RateLimiter, RateLimitIdentity, RateLimitResult, RateLimitConfig, RateLimitWindow } from './rate-limiter.js';
 import { logger } from '../logger.js';
+import { rateLimiterFailOpenTotal, rateLimiterRedisUp } from '../metrics.js';
 
 export interface RedisRateLimiterConfig {
   keyPrefix?: string;
@@ -60,12 +61,35 @@ return {count + 1, 1}
 
 /** Per-process unique prefix for Redis sorted-set members to avoid cross-pod collisions. */
 const INSTANCE_ID = crypto.randomUUID().slice(0, 8);
+const REDIS_WARNING_INTERVAL_MS = 60_000;
 let requestCounter = 0;
+
+/** Track connection health and surface Redis failures even when no requests arrive. */
+export function monitorRedisRateLimiterConnection(redis: Redis): void {
+  let lastErrorLogAt = Number.NEGATIVE_INFINITY;
+
+  rateLimiterRedisUp.set(0);
+  redis.on('ready', () => {
+    rateLimiterRedisUp.set(1);
+    logger.info('Redis rate limiter connection ready');
+  });
+  redis.on('close', () => rateLimiterRedisUp.set(0));
+  redis.on('end', () => rateLimiterRedisUp.set(0));
+  redis.on('error', (err: Error) => {
+    rateLimiterRedisUp.set(0);
+    const now = Date.now();
+    if (now - lastErrorLogAt >= REDIS_WARNING_INTERVAL_MS) {
+      lastErrorLogAt = now;
+      logger.warn({ err: err.message }, 'Redis rate limiter connection error');
+    }
+  });
+}
 
 export class RedisRateLimiter implements RateLimiter {
   private readonly redis: Redis;
   private readonly keyPrefix: string;
   private readonly config: RateLimitConfig;
+  private lastFailOpenLogAt = Number.NEGATIVE_INFINITY;
 
   constructor(redis: Redis, opts?: RedisRateLimiterConfig) {
     this.redis = redis;
@@ -147,7 +171,11 @@ export class RedisRateLimiter implements RateLimiter {
       };
     } catch (err) {
       // Fail open: allow requests when Redis is unavailable
-      logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'RedisRateLimiter Redis error, failing open');
+      rateLimiterFailOpenTotal.inc();
+      if (now - this.lastFailOpenLogAt >= REDIS_WARNING_INTERVAL_MS) {
+        this.lastFailOpenLogAt = now;
+        logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'RedisRateLimiter Redis error, failing open');
+      }
       return { allowed: true, remaining: 0, resetAt: now + 60_000 };
     }
   }
