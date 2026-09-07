@@ -24,7 +24,7 @@
     "@opentelemetry/sdk-metrics": "^2.10.0",
     "@opentelemetry/sdk-node": "^0.221.0",
     "@opentelemetry/sdk-trace-base": "^2.10.0",
-    "pino": "^9.6.0"
+    "pino": "^10.3.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {
