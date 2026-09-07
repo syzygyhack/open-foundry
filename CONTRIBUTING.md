@@ -99,7 +99,12 @@ attribution trailers.
 2. In one `chore(release): X.Y.Z` commit, move the relevant changelog entries
    out of `Unreleased` and align the version in `package.json`, the chart
    `version`/`appVersion`, the default chart image tag, and the install example
-   in `deploy/README.md`.
+   in `deploy/README.md`. Rebuild and regenerate the checked-in API contracts:
+
+   ```bash
+   pnpm run build
+   pnpm --filter @openfoundry/api spec:all
+   ```
 3. Land that commit on `main`, then verify the full CI workflow succeeded for
    its exact SHA. Do not infer this from the latest run:
 
