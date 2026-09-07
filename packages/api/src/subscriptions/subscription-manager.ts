@@ -277,7 +277,7 @@ export function createIdFilteredSubscription(
     // (which would look up the field name) doesn't return undefined.
     resolve: (payload: unknown) => (payload as Record<string, unknown> | undefined)?.[topic],
     subscribe: (_parent: unknown, args: { id: string }, ctx: ResolverContext) => {
-      const baseIterator = pubsub.asyncIterator(topic);
+      const baseIterator = pubsub.asyncIterableIterator(topic);
       const authzService = ctx?.deps?.authorizationService;
       const userId = ctx?.user?.id;
 
@@ -324,7 +324,7 @@ export function createFilteredSubscription(
     // may differ (plural). Extract by topic key.
     resolve: (payload: unknown) => (payload as Record<string, unknown> | undefined)?.[topic],
     subscribe: (_parent: unknown, args: { filter?: SubscriptionFilter }, ctx: ResolverContext) => {
-      const baseIterator = pubsub.asyncIterator(topic);
+      const baseIterator = pubsub.asyncIterableIterator(topic);
       const authzService = ctx?.deps?.authorizationService;
       const userId = ctx?.user?.id;
 
