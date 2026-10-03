@@ -67,7 +67,16 @@ jobs:
                 echo
               } >> findings.md
             fi
-            trivy convert --format table "scan-$img.json" || true
+            # `--scanners vuln` is required here: without it convert prints only
+            # "No enabled scanners found" and renders nothing, which left a green
+            # run with no record of what was covered.
+            if ! trivy convert --scanners vuln --format table "scan-$img.json"; then
+              # Don't fail the job — the JSON above is authoritative and already
+              # determined pass/fail — but don't swallow it either, or findings
+              # would quietly stop appearing in the log.
+              echo "::warning::trivy convert could not render deploy-$img; see the JSON scan result"
+            fi
+            echo "deploy-$img: $(jq '[.Results[]? | .Vulnerabilities[]?] | length' "scan-$img.json") HIGH/CRITICAL finding(s)"
             echo "::endgroup::"
           done
           exit $status
