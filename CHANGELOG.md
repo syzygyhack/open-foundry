@@ -10,6 +10,40 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+### Security
+
+- **Cleared eight HIGH CVEs** reported by the scheduled image scan.
+
+  `axios` 1.18.1 -> 1.20.0 carries seven, including a security-control bypass
+  via unapplied HTTP/2 settings. It is not declared by any workspace package —
+  it arrives through `@openfga/sdk`, so it is the HTTP client behind every
+  authorization check, and the one of the two worth treating as reachable.
+
+  `@grpc/grpc-js` 1.14.4 -> 1.14.5 clears CVE-2026-101916. That advisory is
+  server-side only: it concerns `getAuthContext` on servers created with
+  `requireClientCertificate` disabled, and upstream states that clients need
+  take no action. This platform uses the library solely as the client reaching
+  the CEL evaluator and defines no gRPC server, so it was not exposed. The
+  upgrade keeps the dependency patched and the images scanning clean rather than
+  remediating a reachable flaw.
+
+### Fixed
+
+- **The scheduled scan stopped reporting drift.** It embedded raw Trivy tables
+  in the issue body, and Trivy's table format prepends a report summary listing
+  every scanned target, clean ones included. For a service image that is a few
+  hundred rows of npm packages, so one image's table measures around 150 KB
+  against GitHub's 65536-character body limit; `gh issue create` was rejected and
+  three consecutive red scans filed nothing. The body is now built from the
+  scan's JSON as a summarised table of findings only, with a size guard as a
+  backstop. The scan kept failing correctly throughout — only the notification
+  was lost.
+
+  This was latent rather than new: any finding in a Node service image would
+  have hit it. The one issue this mechanism did file successfully affected only
+  the CEL evaluator, an Alpine image with a handful of scan targets and so a
+  table small enough to fit.
+
 ## [0.3.0] - 2026-09-07
 
 ### Breaking changes

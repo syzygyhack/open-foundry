@@ -46,15 +46,28 @@ jobs:
         run: |
           set -uo pipefail
           status=0
-          : > findings.txt
+          : > findings.md
           for img in cel-evaluator api-gateway ontology-engine action-executor security-service sync-engine; do
             echo "::group::trivy deploy-$img"
+            # JSON is the authoritative output: the issue body is built from it,
+            # and the run log gets a rendered table from the same scan.
             if ! trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 \
-                 --format table --output "scan-$img.txt" "deploy-$img:latest"; then
+                 --format json --output "scan-$img.json" "deploy-$img:latest"; then
               status=1
-              { echo "### deploy-$img"; echo '```'; cat "scan-$img.txt"; echo '```'; } >> findings.txt
+              {
+                echo "### deploy-$img"
+                echo
+                echo '| Package | Vulnerability | Severity | Installed | Fixed |'
+                echo '|---|---|---|---|---|'
+                jq -r '[.Results[]? | .Vulnerabilities[]?]
+                       | unique_by([.VulnerabilityID, .PkgName, .InstalledVersion])
+                       | .[]
+                       | "| \(.PkgName) | \(.VulnerabilityID) | \(.Severity) | \(.InstalledVersion) | \(.FixedVersion // "none") |"' \
+                  "scan-$img.json"
+                echo
+              } >> findings.md
             fi
-            cat "scan-$img.txt" || true
+            trivy convert --format table "scan-$img.json" || true
             echo "::endgroup::"
           done
           exit $status
@@ -66,14 +79,27 @@ jobs:
         run: |
           set -euo pipefail
           title="Security: HIGH/CRITICAL CVEs detected in container images"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           body_file=$(mktemp)
           {
             echo "The scheduled scan found HIGH/CRITICAL vulnerabilities in the built images."
             echo
-            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Run: $run_url"
             echo
-            cat findings.txt
+            cat findings.md
           } > "$body_file"
+          # GitHub rejects a body over 65536 characters. Embedding raw trivy
+          # tables exceeded that, the create failed, and drift then went
+          # unreported for days while the scan kept going red. Summarised rows
+          # are far smaller, and this guard keeps the body bounded regardless of
+          # how many findings land.
+          limit=60000
+          if [ "$(wc -c < "$body_file")" -gt "$limit" ]; then
+            truncated=$(mktemp)
+            head -c "$limit" "$body_file" > "$truncated"
+            printf '\n\n_Findings truncated. Full report in the run log: %s_\n' "$run_url" >> "$truncated"
+            mv "$truncated" "$body_file"
+          fi
           existing=$(gh issue list --state open --label security --search "$title in:title" \
                       --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
