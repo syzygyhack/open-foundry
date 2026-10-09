@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@openfoundry/storage-memory": "workspace:*",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.19.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   }
