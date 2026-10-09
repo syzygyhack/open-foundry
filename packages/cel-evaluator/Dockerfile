@@ -2,7 +2,14 @@
 # Pin the patched toolchain so the compiled Go stdlib is reproducible and does
 # not depend on a moving tag. go.mod intentionally retains Go 1.25 language
 # compatibility; the newer builder supplies current compiler and stdlib fixes.
-FROM golang:1.27.1-alpine AS builder
+# 1.27.2 clears CVE-2026-78667 (net/http) and CVE-2026-97031 (crypto/tls),
+# which the image scan reports against the stdlib linked into this binary.
+# Neither looks reachable as built: this service does not import net/http and
+# never calls the affected ServeContent/ServeFile helpers — grpc-go serves its
+# own HTTP/2 rather than going through net/http — and both server and client are
+# plaintext, so the TLS path is not entered either. The bump is scanner
+# remediation and defence in depth, not a fix for an exploitable path.
+FROM golang:1.27.2-alpine AS builder
 
 WORKDIR /app
 
