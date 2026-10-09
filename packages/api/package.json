@@ -28,7 +28,7 @@
   "dependencies": {
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
-    "@graphql-tools/schema": "^10.1.1",
+    "@graphql-tools/schema": "^10.1.3",
     "@openfga/sdk": "^0.9.7",
     "@openfoundry/actions": "workspace:*",
     "@openfoundry/engine": "workspace:*",

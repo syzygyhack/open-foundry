@@ -24,18 +24,19 @@
   },
   "pnpm": {
     "overrides": {
-      "protobufjs": "^7.6.5",
-      "qs": "^6.16.0",
-      "axios": "^1.20.0",
-      "path-to-regexp@0.1.12": "0.1.13",
       "@grpc/grpc-js": "^1.14.5",
+      "axios": "^1.20.0",
       "form-data": "^4.0.6",
-      "ws": "^8.22.0",
       "nanoid": "^3.3.18",
+      "path-to-regexp@0.1.12": "0.1.13",
       "picomatch": "^4.0.4",
       "postcss": "^8.5.18",
+      "protobufjs": "^7.6.5",
+      "proxy-addr": "^2.0.8",
+      "qs": "^6.16.0",
       "rollup": "^4.59.0",
-      "vite": "^7.3.5"
+      "vite": "^7.3.5",
+      "ws": "^8.22.0"
     }
   }
 }
