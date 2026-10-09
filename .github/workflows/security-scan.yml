@@ -57,12 +57,20 @@ jobs:
               {
                 echo "### deploy-$img"
                 echo
-                echo '| Package | Vulnerability | Severity | Installed | Fixed |'
-                echo '|---|---|---|---|---|'
+                echo '| Package | Vulnerability | Severity | Installed | Fixed | Title |'
+                echo '|---|---|---|---|---|---|'
+                # Title is included but truncated: an ID alone does not say
+                # whether a finding is reachable, and reading the run log to find
+                # out defeats the point of the issue. Trimmed so a long
+                # description cannot push the body back toward the size limit.
+                # Pipes become `\|`, the single-backslash form Markdown requires
+                # — emitting `\\|` would render a literal backslash and leave the
+                # pipe splitting the row. Character class avoids re-escaping it.
                 jq -r '[.Results[]? | .Vulnerabilities[]?]
                        | unique_by([.VulnerabilityID, .PkgName, .InstalledVersion])
                        | .[]
-                       | "| \(.PkgName) | \(.VulnerabilityID) | \(.Severity) | \(.InstalledVersion) | \(.FixedVersion // "none") |"' \
+                       | ((.Title // .Description // "") | gsub("[|]"; "\\|") | gsub("\n"; " ")) as $t
+                       | "| \(.PkgName) | \(.VulnerabilityID) | \(.Severity) | \(.InstalledVersion) | \(.FixedVersion // "none") | \($t[0:120]) |"' \
                   "scan-$img.json"
                 echo
               } >> findings.md
