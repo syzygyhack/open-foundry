@@ -27,6 +27,15 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: 'chore(deps)'
+    ignore:
+      # @types/node must track the runtime, not lead it. Every target is Node 24
+      # (engines, service images and CI all agree), so a major types bump lets
+      # code typecheck against APIs that do not exist at runtime — and CI cannot
+      # catch it, because wider types only permit more. This has been proposed
+      # and declined repeatedly; the rule records the decision rather than
+      # re-litigating it. Remove it in the change that moves the runtime.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       # Stable 2.x and experimental 0.x packages are released together and
       # cross dependency types. Match them before the generic groups so tests
