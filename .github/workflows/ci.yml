@@ -83,8 +83,51 @@ jobs:
           PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/openfoundry_test
         run: pnpm --filter @openfoundry/storage-postgres test
 
+  # Build the service images once and share them, rather than letting each
+  # consumer rebuild. Three jobs previously built the same six images in
+  # parallel, so every run pulled node, golang and alpine three times over —
+  # which is what exhausted the anonymous registry quota and failed the builds
+  # with 429s. One build also means the images that get scanned are the same
+  # bytes that get tested, instead of three independent rebuilds assumed to
+  # agree.
+  build-images:
+    name: Build service images
+    runs-on: ubuntu-latest
+    # Throwaway values: compose interpolates the whole file even to build, and
+    # nothing is started here.
+    env:
+      POSTGRES_PASSWORD: postgres
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build service images
+        run: docker compose -f deploy/docker-compose.yaml build
+
+      - name: Save images
+        run: |
+          set -euo pipefail
+          docker save \
+            deploy-api-gateway:latest \
+            deploy-ontology-engine:latest \
+            deploy-action-executor:latest \
+            deploy-security-service:latest \
+            deploy-sync-engine:latest \
+            deploy-cel-evaluator:latest \
+            | gzip -1 > service-images.tar.gz
+          ls -l service-images.tar.gz
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: service-images
+          path: service-images.tar.gz
+          # Only needed by sibling jobs in this run.
+          retention-days: 1
+          compression-level: 0
+
   docker-stack-integration:
     name: Docker-stack integration
+    needs: build-images
     runs-on: ubuntu-latest
     # docker-compose.yaml has two intentionally-required vars (no defaults —
     # fail loud in prod): POSTGRES_PASSWORD and KEYCLOAK_ADMIN_PASSWORD. Supply
@@ -109,12 +152,15 @@ jobs:
       - name: Create deploy/.env for compose
         run: |
           printf 'POSTGRES_PASSWORD=postgres\nKEYCLOAK_ADMIN_PASSWORD=admin\n' > deploy/.env
-      - name: Build stack images
-        run: >-
-          docker compose
-          -f deploy/docker-compose.yaml
-          -f deploy/docker-compose.test.yaml
-          build
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: service-images
+
+      - name: Load service images
+        run: |
+          set -euo pipefail
+          docker load < service-images.tar.gz
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep '^deploy-'
       # Bring the stack up here (not inside the test harness): the harness's
       # dockerComposeUp wraps `up --wait` in a 300s execSync wall-timeout, which
       # a cold 14-service stack can exceed on CI runners. Starting it in a
@@ -125,7 +171,7 @@ jobs:
           docker compose
           -f deploy/docker-compose.yaml
           -f deploy/docker-compose.test.yaml
-          up -d --wait --wait-timeout 600
+          up -d --no-build --wait --wait-timeout 600
       - name: Integration tests
         run: pnpm run test:integration
       - name: Tear down stack
@@ -138,6 +184,7 @@ jobs:
 
   enforcement-e2e:
     name: Enforcement E2E (prod security, capability gating, consent vocab)
+    needs: build-images
     runs-on: ubuntu-latest
     # The high-value enforcement specs are env-gated + DESTRUCTIVE: each tears the
     # stack down and boots it in a NON-default mode (NODE_ENV=production / a
@@ -168,8 +215,15 @@ jobs:
       # must be built first for vite to resolve them.
       - name: Build workspace
         run: pnpm run build
-      - name: Build stack images
-        run: docker compose -f deploy/docker-compose.yaml build
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: service-images
+
+      - name: Load service images
+        run: |
+          set -euo pipefail
+          docker load < service-images.tar.gz
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep '^deploy-'
       # Each spec self-manages the Docker lifecycle (down -v -> up -> assert ->
       # down -v). Run sequentially; the filename filter + env flag keep exactly
       # one destructive spec active at a time.
@@ -199,6 +253,7 @@ jobs:
 
   image-scan:
     name: Trivy image scan (HIGH/CRITICAL)
+    needs: build-images
     runs-on: ubuntu-latest
     # `docker compose build` interpolates the whole compose file, which has two
     # required vars (POSTGRES_PASSWORD, KEYCLOAK_ADMIN_PASSWORD). Throwaway
@@ -208,8 +263,15 @@ jobs:
       KEYCLOAK_ADMIN_PASSWORD: admin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build all images
-        run: docker compose -f deploy/docker-compose.yaml build
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: service-images
+
+      - name: Load service images
+        run: |
+          set -euo pipefail
+          docker load < service-images.tar.gz
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep '^deploy-'
       - name: Install trivy (checksum verified)
         env:
           TRIVY_VERSION: '0.71.0'
