@@ -1,7 +1,9 @@
 # Build stage
 # Pin the patched toolchain so the compiled Go stdlib is reproducible and does
-# not depend on a moving tag. go.mod intentionally retains Go 1.25 language
-# compatibility; the newer builder supplies current compiler and stdlib fixes.
+# not depend on a moving tag. go.mod previously held the language version a
+# release behind the builder on purpose; taking the patched x/net (with x/sys
+# and x/text alongside it) forced that to move, because those releases require
+# the newer language version and the module will not build without it.
 # 1.27.2 clears CVE-2026-78667 (net/http) and CVE-2026-97031 (crypto/tls),
 # which the image scan reports against the stdlib linked into this binary.
 # Neither looks reachable as built: this service does not import net/http and
@@ -34,8 +36,8 @@ RUN mkdir -p /tools && cd /tools \
     && go mod init tools \
     && GOFLAGS=-mod=mod go get github.com/grpc-ecosystem/grpc-health-probe@v0.4.53 \
     && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.83.2 \
-    && GOFLAGS=-mod=mod go get golang.org/x/text@v0.41.0 \
-    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.58.0 \
+    && GOFLAGS=-mod=mod go get golang.org/x/text@v0.42.0 \
+    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.60.0 \
     && GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
 
