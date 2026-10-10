@@ -15,6 +15,10 @@ permissions:
 
 env:
   TRIVY_VERSION: '0.71.0'
+  # Default DB resolution goes via a mirror that has both 404'd and throttled
+  # with 429s; name the upstream registry explicitly so the scan does not
+  # depend on a mirror's quota.
+  TRIVY_DB_REPOSITORY: 'ghcr.io/aquasecurity/trivy-db:2'
 
 jobs:
   scan:

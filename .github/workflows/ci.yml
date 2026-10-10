@@ -261,6 +261,10 @@ jobs:
     env:
       POSTGRES_PASSWORD: postgres
       KEYCLOAK_ADMIN_PASSWORD: admin
+      # Job-scoped so the scan step sees it, not just the installer. Default DB
+      # resolution goes via a mirror that has both 404'd and throttled with
+      # 429s; naming the upstream registry keeps the scan off a mirror's quota.
+      TRIVY_DB_REPOSITORY: 'ghcr.io/aquasecurity/trivy-db:2'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

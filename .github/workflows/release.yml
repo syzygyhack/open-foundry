@@ -78,6 +78,12 @@ jobs:
     name: Publish release
     needs: verify
     runs-on: ubuntu-latest
+    env:
+      # Job-scoped: both the installer and the SBOM step run trivy. Default DB
+      # resolution goes via a mirror that has both 404'd and throttled with
+      # 429s; naming the upstream registry keeps release artifacts off a
+      # mirror's quota.
+      TRIVY_DB_REPOSITORY: 'ghcr.io/aquasecurity/trivy-db:2'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
