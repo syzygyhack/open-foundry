@@ -18,8 +18,8 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "turbo": "^2.11.3",
+    "@types/node": "^24.19.2",
+    "turbo": "^2.11.8",
     "typescript": "^7.0.2"
   },
   "pnpm": {
