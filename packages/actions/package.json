@@ -23,7 +23,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@grpc/grpc-js": "^1.12.0",
+    "@grpc/grpc-js": "^1.14.6",
     "@grpc/proto-loader": "^0.8.1",
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/odl": "workspace:*",
