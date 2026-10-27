@@ -4,14 +4,16 @@
 # release behind the builder on purpose; taking the patched x/net (with x/sys
 # and x/text alongside it) forced that to move, because those releases require
 # the newer language version and the module will not build without it.
-# 1.27.2 clears CVE-2026-78667 (net/http) and CVE-2026-97031 (crypto/tls),
-# which the image scan reports against the stdlib linked into this binary.
-# Neither looks reachable as built: this service does not import net/http and
-# never calls the affected ServeContent/ServeFile helpers — grpc-go serves its
-# own HTTP/2 rather than going through net/http — and both server and client are
-# plaintext, so the TLS path is not entered either. The bump is scanner
-# remediation and defence in depth, not a fix for an exploitable path.
-FROM golang:1.27.2-alpine AS builder
+# The image scan reports stdlib advisories against whichever toolchain built the
+# binary, so this pin moves when one lands. 1.27.3 clears CVE-2026-111943
+# (crypto/x509, a certificate-authority distrust), on top of the net/http and
+# crypto/tls fixes that motivated 1.27.2. None of the three looks reachable as
+# built: this service does not import net/http, never calls the affected
+# ServeContent/ServeFile helpers — grpc-go serves its own HTTP/2 rather than going
+# through net/http — and both server and client are plaintext, so no certificate
+# is ever presented or verified. These bumps are scanner remediation and defence
+# in depth, not fixes for exploitable paths.
+FROM golang:1.27.3-alpine AS builder
 
 WORKDIR /app
 
