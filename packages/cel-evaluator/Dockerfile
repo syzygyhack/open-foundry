@@ -11,7 +11,7 @@
 # own HTTP/2 rather than going through net/http — and both server and client are
 # plaintext, so the TLS path is not entered either. The bump is scanner
 # remediation and defence in depth, not a fix for an exploitable path.
-FROM golang:1.27.2-alpine AS builder
+FROM golang:1.27.3-alpine AS builder
 
 WORKDIR /app
 
