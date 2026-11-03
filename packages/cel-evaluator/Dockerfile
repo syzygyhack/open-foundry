@@ -34,12 +34,20 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /cel-evaluator .
 # GHSA-hrxh-6v49-42gf) with no way for us to override them. Inside a module we
 # can require the patched grpc explicitly; MVS then selects it for the build.
 # Keep the grpc version here in step with the one in go.mod.
+#
+# go-jose is pinned for the same reason. The probe pulls it in through its SPIFFE
+# support, and the image scan flags the version it would otherwise resolve
+# (CVE-2026-116587, CPU exhaustion parsing a crafted JWK). The probe here only
+# ever runs as a plaintext health check, so that path is never entered — but the
+# service image is scanned as a whole, and this module is the only place the
+# version can be forced.
 RUN mkdir -p /tools && cd /tools \
     && go mod init tools \
     && GOFLAGS=-mod=mod go get github.com/grpc-ecosystem/grpc-health-probe@v0.4.53 \
     && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.83.2 \
     && GOFLAGS=-mod=mod go get golang.org/x/text@v0.42.0 \
     && GOFLAGS=-mod=mod go get golang.org/x/net@v0.60.0 \
+    && GOFLAGS=-mod=mod go get github.com/go-jose/go-jose/v4@v4.1.8 \
     && GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
 
