@@ -13,7 +13,7 @@
 # through net/http — and both server and client are plaintext, so no certificate
 # is ever presented or verified. These bumps are scanner remediation and defence
 # in depth, not fixes for exploitable paths.
-FROM golang:1.27.3-alpine AS builder
+FROM golang:1.27.4-alpine AS builder
 
 WORKDIR /app
 
