@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "turbo": "^2.11.8",
+    "turbo": "^2.11.11",
     "typescript": "^7.0.2"
   },
   "pnpm": {
