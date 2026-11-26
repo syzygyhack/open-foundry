@@ -202,7 +202,7 @@ services:
       REDIS_URL: "redis://redis:6379"
       KEYCLOAK_URL: "http://keycloak:8080/auth"
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-openfoundry}
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
       OTEL_SERVICE_NAME: api-gateway
       DOMAIN_PACKS: ${DOMAIN_PACKS:-}
       DOMAIN_PACKS_EXTRA_DIRS: ${DOMAIN_PACKS_EXTRA_DIRS:-}
@@ -268,7 +268,7 @@ services:
       NODE_ENV: development
       PORT: "4001"
       POSTGRES_URL: "postgresql://${POSTGRES_USER:-openfoundry}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB:-openfoundry}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
       OTEL_SERVICE_NAME: ontology-engine
     depends_on:
       postgresql:
@@ -294,7 +294,7 @@ services:
       CEL_EVALUATOR_URL: "cel-evaluator:50051"
       POSTGRES_URL: "postgresql://${POSTGRES_USER:-openfoundry}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB:-openfoundry}"
       REDPANDA_BROKERS: "redpanda:9092"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
       OTEL_SERVICE_NAME: action-executor
     depends_on:
       postgresql:
@@ -324,7 +324,7 @@ services:
       POSTGRES_URL: "postgresql://${POSTGRES_USER:-openfoundry}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB:-openfoundry}"
       REDPANDA_BROKERS: "redpanda:9092"
       DEBEZIUM_URL: "http://debezium:8083"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
       OTEL_SERVICE_NAME: sync-engine
     depends_on:
       postgresql:
@@ -356,7 +356,7 @@ services:
       OPENFGA_STORE_ID: ${OPENFGA_STORE_ID:-}
       KEYCLOAK_URL: "http://keycloak:8080/auth"
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-openfoundry}
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
       OTEL_SERVICE_NAME: security-service
     depends_on:
       postgresql:

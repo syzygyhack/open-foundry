@@ -2852,7 +2852,7 @@ helm install my-instance openfoundry/openfoundry \
   --set federation.enabled=true \
   --set federation.instanceId=nhs-trust-leeds \
   --set federation.endpoint=https://openfoundry.leeds.nhs.uk \
-  --set observability.otlp.endpoint=https://otel-collector:4317
+  --set observability.otlp.endpoint=https://otel-collector:4318
 ```
 
 ### 12.3 Minimal Development Deployment

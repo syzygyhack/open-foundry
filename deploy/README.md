@@ -39,7 +39,7 @@ open http://localhost:4000/graphql
 | redis | 6379 | Rate limiter + cache store |
 | redpanda | 19092 | Kafka-compatible streaming |
 | debezium | 8083 | Change Data Capture |
-| otel-collector | 4317 | OpenTelemetry traces/metrics |
+| otel-collector | 4317, 4318 | OpenTelemetry collector: OTLP gRPC and OTLP/HTTP (the services export over HTTP to 4318) |
 | keycloak | 8180 | Identity provider (OIDC) |
 | openfga-migrate | — | One-shot init container: applies the OpenFGA datastore migrations before `openfga` starts |
 

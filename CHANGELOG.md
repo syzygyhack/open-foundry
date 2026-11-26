@@ -80,6 +80,17 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Traces now reach the collector.** Every deployment pointed the services at
+  the collector's gRPC port (4317), while the services export with the OTLP/HTTP
+  exporter. HTTP/1.1 to a gRPC listener gets an HTTP/2 frame back, so every export
+  failed with a parse error. The failure was non-fatal and logged only at
+  `OTEL_LOG_LEVEL=info` or above, so it went unnoticed, and no span ever reached
+  the collector. Compose and the Helm chart now point at the OTLP/HTTP receiver
+  on 4318. The chart default also lacked a URL scheme, and the network policy only
+  allowed egress to 4317; both are corrected. In the compose stack, the
+  integration suite now produces spans at the collector (148 in one run, against
+  0 before).
+
 - **The drift issue no longer repeats itself or outlives the drift.** The scheduled
   scan commented the same findings on the tracking issue every day and never
   closed it, so it read as permanently on fire. It now fingerprints the findings

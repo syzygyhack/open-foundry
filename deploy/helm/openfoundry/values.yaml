@@ -86,7 +86,11 @@ domainPacksExtra:
 # -- Observability (OpenTelemetry)
 observability:
   otlp:
-    endpoint: otel-collector:4317
+    # Base URL of the collector's OTLP/HTTP receiver (port 4318). The services
+    # export with the HTTP exporter and append /v1/traces themselves, so this
+    # needs a scheme and must not be the gRPC port (4317): an HTTP client talking
+    # to a gRPC listener gets an HTTP/2 frame back and every export fails.
+    endpoint: http://otel-collector:4318
 
 # -- Sync engine / CDC
 sync:

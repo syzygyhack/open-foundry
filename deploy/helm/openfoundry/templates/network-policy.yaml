@@ -48,7 +48,8 @@ spec:
           protocol: TCP
         - port: 8080
           protocol: TCP
-        - port: 4317
+        # OTLP/HTTP — the services' exporter (not gRPC on 4317).
+        - port: 4318
           protocol: TCP
         - port: 6379
           protocol: TCP
