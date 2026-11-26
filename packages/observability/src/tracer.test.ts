@@ -5,28 +5,29 @@ import {
   context as otelContext,
 } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { getTracer, withSpan, getActiveSpan, SpanAttributes } from "./tracer.js";
 
 describe("tracer", () => {
   let exporter: InMemorySpanExporter;
-  let provider: BasicTracerProvider;
+  let provider: TracerProvider;
   let contextManager: AsyncLocalStorageContextManager;
 
   beforeEach(() => {
     exporter = new InMemorySpanExporter();
     contextManager = new AsyncLocalStorageContextManager();
     contextManager.enable();
-    // OTEL JS 2.x: span processors are supplied via the constructor
-    // (BasicTracerProvider.addSpanProcessor was removed), and the convenience
-    // provider.register() was removed — register the provider and context
-    // manager on the global API explicitly.
-    provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    // OTEL JS 3.x: sdk-trace-base became sdk-trace, BasicTracerProvider became
+    // TracerProvider, and span processors take an options object rather than
+    // a bare exporter. As in 2.x, span processors are supplied via the
+    // constructor and there is no provider.register(), so the provider and
+    // context manager are registered on the global API explicitly.
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
     otelContext.setGlobalContextManager(contextManager);
     trace.setGlobalTracerProvider(provider);

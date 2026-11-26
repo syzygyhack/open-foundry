@@ -62,6 +62,22 @@ are called out under **Breaking changes**.
   by default but only negotiated over RESP3; the rate limiter's client pins RESP2,
   so the handshake is never sent and the connection behaves as on 6.0.
 
+- **OpenTelemetry moves to the 3.x SDK** (`sdk-node` and the OTLP exporter
+  0.301, `api` 1.10). The previous upgrade held the family on 2.x because the
+  grouped proposal moved only the experimental half of the release train. This
+  takes the whole train: one API, one core and one SDK line across the tree,
+  including `@openfga/sdk`'s copy of the API, which now dedupes to the same 1.10.
+  Production tracing is unchanged in shape: `initTelemetry` still builds a
+  `NodeSDK` with the OTLP HTTP exporter, and against a live collector it exports
+  parent and child spans with the parent kept across asynchronous boundaries.
+
+  `sdk-trace-base` is retired upstream in favour of `sdk-trace`, where
+  `BasicTracerProvider` is `TracerProvider` and span processors take an options
+  object. Only the tests used those packages, so `sdk-trace` and `sdk-metrics`
+  are now development dependencies rather than runtime ones. Passing the exporter
+  positionally, as 2.x did, still compiles under the test runner, which strips
+  types, but exports nothing; typecheck is what caught it.
+
 ### Fixed
 
 - **The drift issue no longer repeats itself or outlives the drift.** The scheduled

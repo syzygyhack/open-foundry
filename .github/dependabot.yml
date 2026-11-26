@@ -37,12 +37,19 @@ updates:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
     groups:
-      # Stable 2.x and experimental 0.x packages are released together and
-      # cross dependency types. Match them before the generic groups so tests
+      # Stable and experimental (0.x) packages are released together and cross
+      # dependency types. Match them before the generic groups so tests
       # exercise the same SDK family used at runtime.
+      #
+      # Majors are deliberately included here, unlike the other groups. The
+      # experimental packages are 0.x, so a breaking release train arrives as a
+      # semver *minor* on them (0.223 -> 0.300) and a major on the stable ones
+      # (2.x -> 3.x). Restricting to minor/patch let the experimental half of a
+      # train through while holding the stable half back, which is how a
+      # half-migrated tree was once proposed. Taking the whole train in one PR
+      # keeps every proposal internally consistent; review it as a migration.
       opentelemetry:
         patterns: ['@opentelemetry/*']
-        update-types: ['minor', 'patch']
       # One PR per ecosystem area keeps the review load sane in a 19-package
       # workspace; security updates still arrive individually and immediately.
       dev-tooling:
