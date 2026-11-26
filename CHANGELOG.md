@@ -83,8 +83,8 @@ are called out under **Breaking changes**.
 - **Traces now reach the collector.** Every deployment pointed the services at
   the collector's gRPC port (4317), while the services export with the OTLP/HTTP
   exporter. HTTP/1.1 to a gRPC listener gets an HTTP/2 frame back, so every export
-  failed with a parse error. The failure was non-fatal and logged only at
-  `OTEL_LOG_LEVEL=info` or above, so it went unnoticed, and no span ever reached
+  failed with a parse error. The failure was non-fatal and logged only when
+  `OTEL_LOG_LEVEL` is set, so it went unnoticed, and no span ever reached
   the collector. Compose and the Helm chart now point at the OTLP/HTTP receiver
   on 4318. The chart default also lacked a URL scheme, and the network policy only
   allowed egress to 4317; both are corrected. In the compose stack, the

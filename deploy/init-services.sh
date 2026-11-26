@@ -201,7 +201,7 @@ main() {
   log "  Keycloak Admin:     http://localhost:8180/auth/admin"
   log "  OpenFGA Playground: http://localhost:8280/playground"
   log "  Debezium:           http://localhost:8083/"
-  log "  OTEL Collector:     http://localhost:4317 (gRPC)"
+  log "  OTEL Collector:     http://localhost:4318 (OTLP/HTTP, used by the services), :4317 (gRPC)"
 }
 
 main "$@"

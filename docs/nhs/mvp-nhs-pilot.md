@@ -740,7 +740,7 @@ provides:
 | `postgresql` | `postgres:17` | 5432 | Ontology store + audit log + OpenFGA store. |
 | `redpanda` | `redpandadata/redpanda:latest` | 9092 | Event bus (Kafka-compatible). |
 | `debezium` | `debezium/connect:2.x` | 8083 | CDC from PAS database. |
-| `otel-collector` | `otel/opentelemetry-collector:latest` | 4317 | Trace + metric collection. |
+| `otel-collector` | `otel/opentelemetry-collector:latest` | 4318 (OTLP/HTTP), 4317 (gRPC) | Trace + metric collection. Services export over OTLP/HTTP on 4318. |
 | `keycloak` | `quay.io/keycloak/keycloak:latest` | 8180 | OIDC provider (dev only; replaced by NHS CIS2 in prod). |
 
 ### 5.2 Docker Compose (Development)
@@ -765,7 +765,7 @@ helm install nhs-pilot openfoundry/openfoundry \
   --set auth.oidc.clientId=$CIS2_CLIENT_ID \
   --set domainPacks[0].name=nhs-acute \
   --set domainPacks[0].version=0.1.0 \
-  --set observability.otlp.endpoint=otel-collector.internal:4317 \
+  --set observability.otlp.endpoint=http://otel-collector.internal:4318 \
   --set sync.pas.dbUrl=$PAS_DB_URL
 ```
 
