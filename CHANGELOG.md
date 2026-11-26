@@ -21,6 +21,20 @@ are called out under **Breaking changes**.
   remediation rather than a fix for a reachable path. It had kept the scheduled
   scan red since 7 November and failed the image-scan gate on every open PR.
 
+- **Kept `@graphql-tools/utils` on its patched release (CVE-2026-114604, HIGH).**
+  `@apollo/server` 5.5.2 caps the package below 12.0.2 — the fixed version — so
+  that npm installs on Node 20 avoid a transitive dependency requiring Node
+  22.15. This project requires Node 24, so the cap protects nothing here; an
+  override holds the package at `^12.0.3` and the gateway image ships only that.
+  Without it, the routine `@apollo/server` update would have introduced the
+  vulnerability.
+
+- **Raised the `vite` and `qs` floors past six Dependabot advisories** (one high,
+  four medium, one low). Vite is test tooling only, and reaches the tree as an
+  auto-installed peer of Vitest. pnpm does not re-resolve a locked peer when an
+  override changes, so the stale 7.3.6 entry was removed from the lockfile and
+  re-resolved; 7.3.8 is now the only version.
+
 - **Cleared eight HIGH CVEs** reported by the scheduled image scan.
 
   `axios` 1.18.1 -> 1.20.0 carries seven, including a security-control bypass
@@ -35,6 +49,14 @@ are called out under **Breaking changes**.
   the CEL evaluator and defines no gRPC server, so it was not exposed. The
   upgrade keeps the dependency patched and the images scanning clean rather than
   remediating a reachable flaw.
+
+### Changed
+
+- Routine updates: `@apollo/server` 5.5.2, `@grpc/grpc-js` 1.14.7 (override floor
+  moved with it), `@openfga/sdk` 0.9.8, `graphql-subscriptions` 3.1.0,
+  `graphql-ws` 6.4.3, `ws` 8.23.0 (override floor moved with it), `commander`
+  15.1.0, `jose` 6.2.18, `turbo` 2.11.11, `vitest` 5.1.0, `pnpm/action-setup`
+  6.1.1 and `azure/setup-helm` 5.1.0.
 
 ### Fixed
 

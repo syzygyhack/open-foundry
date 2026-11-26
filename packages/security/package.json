@@ -19,15 +19,15 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@openfga/sdk": "^0.9.7",
+    "@openfga/sdk": "^0.9.8",
     "@openfoundry/observability": "workspace:*",
     "@openfoundry/spi": "workspace:*",
-    "jose": "^6.2.13"
+    "jose": "^6.2.18"
   },
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "^24.19.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.1.0"
   }
 }

@@ -25,12 +25,12 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "commander": "^15.0.0",
+    "commander": "^15.1.0",
     "graphql": "^16.10.0"
   },
   "devDependencies": {
     "@openfoundry/spi": "workspace:*",
     "@types/node": "^24.19.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.1.0"
   }
 }
