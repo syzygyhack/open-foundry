@@ -60,6 +60,11 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **The drift issue no longer repeats itself or outlives the drift.** The scheduled
+  scan commented the same findings on the tracking issue every day and never
+  closed it, so it read as permanently on fire. It now fingerprints the findings
+  and comments only when they change, and closes the issue on a clean scan.
+
 - **The scheduled scan stopped reporting drift.** It embedded raw Trivy tables
   in the issue body, and Trivy's table format prepends a report summary listing
   every scanned target, clean ones included. For a service image that is a few

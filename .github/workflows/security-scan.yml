@@ -121,10 +121,38 @@ jobs:
             printf '\n\n_Findings truncated. Full report in the run log: %s_\n' "$run_url" >> "$truncated"
             mv "$truncated" "$body_file"
           fi
+          # Fingerprint the findings (not the run URL) so an unchanged result
+          # does not add an identical comment every day. The marker is an HTML
+          # comment, invisible when rendered, read back from the latest post.
+          fingerprint=$(sha256sum findings.md | cut -c1-16)
+          printf '\n<!-- findings-sha: %s -->\n' "$fingerprint" >> "$body_file"
+          existing=$(gh issue list --state open --label security --search "$title in:title" \
+                      --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --label security --body-file "$body_file"
+            exit 0
+          fi
+          last=$(gh issue view "$existing" --json body,comments \
+                   --jq '[.body] + [.comments[].body] | map(capture("findings-sha: (?<s>[0-9a-f]+)").s) | last // ""')
+          if [ "$last" = "$fingerprint" ]; then
+            echo "Findings unchanged since the last report on #$existing; not commenting."
+          else
+            gh issue comment "$existing" --body-file "$body_file"
+          fi
+
+      # The drift issue tracks a condition, so it closes when the condition does.
+      # Without this it stayed open after remediation until someone noticed.
+      - name: Close the drift issue on a clean scan
+        if: success() && steps.scan.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="Security: HIGH/CRITICAL CVEs detected in container images"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           existing=$(gh issue list --state open --label security --search "$title in:title" \
                       --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body-file "$body_file"
-          else
-            gh issue create --title "$title" --label security --body-file "$body_file"
+            gh issue close "$existing" --reason completed \
+              --comment "The scheduled scan is clean: no HIGH/CRITICAL findings in any image. Run: $run_url"
           fi
