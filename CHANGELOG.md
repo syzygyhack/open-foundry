@@ -12,6 +12,15 @@ are called out under **Breaking changes**.
 
 ### Security
 
+- **Cleared CVE-2026-78661 (HIGH) from the CEL evaluator image.**
+  `golang.org/x/net` v0.60.0 -> v0.62.0, with `x/text` and `x/sys` alongside it,
+  in both the service module and the health probe's tools module; the build
+  toolchain moves to Go 1.27.4. The advisory is a denial of service in
+  `x/net/html`, which neither binary links (they take only the HTTP/2, hpack,
+  httpguts, idna and trace packages, through gRPC), so this is scanner
+  remediation rather than a fix for a reachable path. It had kept the scheduled
+  scan red since 7 November and failed the image-scan gate on every open PR.
+
 - **Cleared eight HIGH CVEs** reported by the scheduled image scan.
 
   `axios` 1.18.1 -> 1.20.0 carries seven, including a security-control bypass

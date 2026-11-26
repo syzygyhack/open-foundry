@@ -12,8 +12,9 @@
 # ServeContent/ServeFile helpers — grpc-go serves its own HTTP/2 rather than going
 # through net/http — and both server and client are plaintext, so no certificate
 # is ever presented or verified. These bumps are scanner remediation and defence
-# in depth, not fixes for exploitable paths.
-FROM golang:1.27.3-alpine AS builder
+# in depth, not fixes for exploitable paths. 1.27.4 is the current patch release
+# of the line and is taken so the pin does not trail it.
+FROM golang:1.27.4-alpine AS builder
 
 WORKDIR /app
 
@@ -41,12 +42,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /cel-evaluator .
 # ever runs as a plaintext health check, so that path is never entered — but the
 # service image is scanned as a whole, and this module is the only place the
 # version can be forced.
+#
+# x/net and x/text move in step with go.mod. v0.62.0 clears CVE-2026-78661, a
+# denial of service in x/net/html. Neither binary links that package — `go list
+# -deps` shows only http2, hpack, httpguts, idna and trace from x/net, all via
+# grpc — but the scan reports at module granularity, so both pins move.
 RUN mkdir -p /tools && cd /tools \
     && go mod init tools \
     && GOFLAGS=-mod=mod go get github.com/grpc-ecosystem/grpc-health-probe@v0.4.53 \
     && GOFLAGS=-mod=mod go get google.golang.org/grpc@v1.83.2 \
-    && GOFLAGS=-mod=mod go get golang.org/x/text@v0.42.0 \
-    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.60.0 \
+    && GOFLAGS=-mod=mod go get golang.org/x/text@v0.43.0 \
+    && GOFLAGS=-mod=mod go get golang.org/x/net@v0.62.0 \
     && GOFLAGS=-mod=mod go get github.com/go-jose/go-jose/v4@v4.1.8 \
     && GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/grpc-health-probe \
        github.com/grpc-ecosystem/grpc-health-probe
