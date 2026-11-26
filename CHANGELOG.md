@@ -58,6 +58,10 @@ are called out under **Breaking changes**.
   15.1.0, `jose` 6.2.18, `turbo` 2.11.11, `vitest` 5.1.0, `pnpm/action-setup`
   6.1.1 and `azure/setup-helm` 5.1.0.
 
+- `ioredis` 6.1.0. Its headline feature, maintenance-notification handoffs, is on
+  by default but only negotiated over RESP3; the rate limiter's client pins RESP2,
+  so the handshake is never sent and the connection behaves as on 6.0.
+
 ### Fixed
 
 - **The drift issue no longer repeats itself or outlives the drift.** The scheduled
