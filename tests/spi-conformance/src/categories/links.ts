@@ -475,6 +475,28 @@ export function registerLinkTests(name: string, factory: ProviderFactory): void 
       });
     });
 
+    describe('unknown link types', () => {
+      it('rejects a link type the schema does not declare with TYPE_NOT_FOUND', async () => {
+        await expect(provider.createLink(tenantA, 'NoSuchLink', patientId1, teamId1)).rejects.toMatchObject({
+          code: 'TYPE_NOT_FOUND',
+        });
+        await expect(provider.getLinks(tenantA, patientId1, 'NoSuchLink', 'outbound')).rejects.toMatchObject({
+          code: 'TYPE_NOT_FOUND',
+        });
+        await expect(
+          provider.traverse(tenantA, patientId1, { steps: [{ linkType: 'NoSuchLink', direction: 'outbound' }] }),
+        ).rejects.toMatchObject({ code: 'TYPE_NOT_FOUND' });
+      });
+
+      it('rejects a traversal step filter on a field its target type does not declare', async () => {
+        await expect(
+          provider.traverse(tenantA, patientId1, {
+            steps: [{ linkType: 'AssignedTo', direction: 'outbound', filter: { field: 'age', operator: 'eq', value: 1 } }],
+          }),
+        ).rejects.toMatchObject({ code: 'INVALID_FILTER' });
+      });
+    });
+
     describe('endpoints must exist (spec §3.3 rule 5)', () => {
       it('rejects a link to an object that does not exist', async () => {
         await expect(provider.createLink(tenantA, 'AssignedTo', patientId1, 'no-such-team')).rejects.toThrow(

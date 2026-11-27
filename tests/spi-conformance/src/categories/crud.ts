@@ -136,9 +136,20 @@ export function registerCrudTests(name: string, factory: ProviderFactory): void 
         expect(result).toBeNull();
       });
 
-      it('returns null for non-existent type', async () => {
-        const result = await provider.getObject(tenantA, 'NonExistentType', 'some-id');
-        expect(result).toBeNull();
+      it('rejects a type the schema does not declare with TYPE_NOT_FOUND', async () => {
+        await expect(provider.getObject(tenantA, 'NonExistentType', 'some-id')).rejects.toMatchObject({
+          code: 'TYPE_NOT_FOUND',
+        });
+        await expect(provider.createObject(tenantA, 'NonExistentType', { name: 'x' })).rejects.toMatchObject({
+          code: 'TYPE_NOT_FOUND',
+        });
+        await expect(
+          provider.queryObjects(tenantA, 'NonExistentType', { field: 'name', operator: 'eq', value: 'x' }),
+        ).rejects.toMatchObject({ code: 'TYPE_NOT_FOUND' });
+      });
+
+      it('returns null for a missing object of a declared type', async () => {
+        expect(await provider.getObject(tenantA, 'Patient', 'no-such-id')).toBeNull();
       });
 
       it('retrieved object is a copy (modifying does not affect stored)', async () => {

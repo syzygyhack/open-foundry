@@ -37,6 +37,7 @@ import type {
   SearchQuery,
   SearchResult,
 } from '@openfoundry/spi';
+import { assertObjectType, assertLinkType, assertFilterFields } from '@openfoundry/spi';
 
 // ─── Module imports ───
 import { createLogger } from '@openfoundry/observability';
@@ -104,17 +105,21 @@ class PgSpiTransaction implements Transaction {
     private _tx: PgTransaction,
     private _schema: string,
     private _resolveLink: (linkType: string) => LinkTypeDefinition | undefined,
+    private _guard: { _guardObject(type: string): void; _guardLink(type: string): void },
   ) {}
 
   async createObject(type: string, properties: Record<string, unknown>): Promise<OntologyObject> {
+    this._guard._guardObject(type);
     return pgCreateObject(this._pool, this._ctx, type, properties, this._schema, this._tx);
   }
 
   async updateObject(type: string, id: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyObject> {
+    this._guard._guardObject(type);
     return pgUpdateObject(this._pool, this._ctx, type, id, properties, this._schema, this._tx, expectedVersion);
   }
 
   async deleteObject(type: string, id: string, mode: 'soft' | 'hard'): Promise<void> {
+    this._guard._guardObject(type);
     if (mode === 'soft') {
       await pgSoftDeleteObject(this._pool, this._ctx, type, id, this._schema, this._tx);
     } else {
@@ -123,6 +128,7 @@ class PgSpiTransaction implements Transaction {
   }
 
   async createLink(type: string, fromId: string, toId: string, properties?: Record<string, unknown>): Promise<OntologyLink> {
+    this._guard._guardLink(type);
     const def = this._resolveLink(type);
     const fromType = def?.fromType ?? 'unknown';
     const toType = def?.toType ?? 'unknown';
@@ -139,10 +145,12 @@ class PgSpiTransaction implements Transaction {
   }
 
   async updateLink(type: string, linkId: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyLink> {
+    this._guard._guardLink(type);
     return pgUpdateLink(this._pool, this._ctx, type, linkId, properties, this._schema, this._tx, expectedVersion);
   }
 
   async deleteLink(type: string, linkId: string): Promise<void> {
+    this._guard._guardLink(type);
     await pgDeleteLink(this._pool, this._ctx, type, linkId, this._schema, this._tx);
   }
 
@@ -478,10 +486,12 @@ export class PostgresStorageProvider implements StorageProvider {
   // ─── Objects ───
 
   async createObject(ctx: RequestContext, type: string, properties: Record<string, unknown>): Promise<OntologyObject> {
+    this._guardObject(type);
     return pgCreateObject(this._pool, ctx, type, properties, this._dataSchema);
   }
 
   async getObject(ctx: RequestContext, type: string, id: string): Promise<OntologyObject | null> {
+    this._guardObject(type);
     const obj = await withRetry(() => pgGetObject(this._pool, ctx, type, id, this._dataSchema));
     if (!obj) return null;
     // Follow SPI convention: return null for soft-deleted (like memory provider)
@@ -490,10 +500,12 @@ export class PostgresStorageProvider implements StorageProvider {
   }
 
   async updateObject(ctx: RequestContext, type: string, id: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyObject> {
+    this._guardObject(type);
     return pgUpdateObject(this._pool, ctx, type, id, properties, this._dataSchema, undefined, expectedVersion);
   }
 
   async deleteObject(ctx: RequestContext, type: string, id: string, mode: 'soft' | 'hard'): Promise<void> {
+    this._guardObject(type);
     if (mode === 'soft') {
       await pgSoftDeleteObject(this._pool, ctx, type, id, this._dataSchema);
     } else {
@@ -502,14 +514,20 @@ export class PostgresStorageProvider implements StorageProvider {
   }
 
   async queryObjects(ctx: RequestContext, type: string, filter: FilterExpression, options?: QueryOptions): Promise<ObjectPage> {
+    this._guardObject(type);
+    this._guardFilter('object', type, filter);
     return withRetry(() => pgQueryObjects(this._pool, ctx, type, filter, options, this._dataSchema));
   }
 
   async aggregateObjects(ctx: RequestContext, type: string, query: AggregateQuery): Promise<AggregateResult> {
+    this._guardObject(type);
+    this._guardFilter('object', type, query.filter);
     return withRetry(() => pgAggregateObjects(this._pool, ctx, type, query, this._dataSchema));
   }
 
   async searchObjects(ctx: RequestContext, type: string, query: SearchQuery): Promise<SearchResult> {
+    this._guardObject(type);
+    this._guardFilter('object', type, query.filter);
     return withRetry(() => pgSearchObjects(this._pool, ctx, type, query, this._dataSchema));
   }
 
@@ -569,6 +587,7 @@ export class PostgresStorageProvider implements StorageProvider {
     toId: string,
     properties?: Record<string, unknown>,
   ): Promise<OntologyLink> {
+    this._guardLink(type);
     const def = this._getLinkTypeDef(type);
     const fromType = def?.fromType ?? 'unknown';
     const toType = def?.toType ?? 'unknown';
@@ -584,6 +603,7 @@ export class PostgresStorageProvider implements StorageProvider {
   }
 
   async getLink(ctx: RequestContext, type: string, linkId: string): Promise<OntologyLink | null> {
+    this._guardLink(type);
     const link = await withRetry(() => pgGetLink(this._pool, ctx, type, linkId, this._dataSchema));
     if (!link) return null;
     if (link._deletedAt) return null;
@@ -591,10 +611,12 @@ export class PostgresStorageProvider implements StorageProvider {
   }
 
   async updateLink(ctx: RequestContext, type: string, linkId: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyLink> {
+    this._guardLink(type);
     return pgUpdateLink(this._pool, ctx, type, linkId, properties, this._dataSchema, undefined, expectedVersion);
   }
 
   async deleteLink(ctx: RequestContext, type: string, linkId: string): Promise<void> {
+    this._guardLink(type);
     await pgDeleteLink(this._pool, ctx, type, linkId, this._dataSchema);
   }
 
@@ -605,6 +627,7 @@ export class PostgresStorageProvider implements StorageProvider {
     direction: 'inbound' | 'outbound',
     options?: QueryOptions,
   ): Promise<LinkPage> {
+    this._guardLink(linkType);
     const def = this._getLinkTypeDef(linkType);
     const endpoints = def ? { fromType: def.fromType, toType: def.toType } : undefined;
     return withRetry(() =>
@@ -618,7 +641,41 @@ export class PostgresStorageProvider implements StorageProvider {
     path: TraversalPath,
     options?: TraversalOptions,
   ): Promise<TraversalResult> {
+    this._guardPath(path);
     return withRetry(() => pgTraverse(this._pool, ctx, startId, path, options, this._dataSchema));
+  }
+
+  // ─── Schema guards (unknown type / filter field) ───
+
+  private _guardSchema(): OntologySchema | undefined {
+    return this._currentSchemaVersion > 0 ? this._schemas.get(this._currentSchemaVersion) : undefined;
+  }
+
+  /** @internal Throws TYPE_NOT_FOUND for an undeclared object type. */
+  _guardObject(type: string): void {
+    assertObjectType(this._guardSchema(), type);
+  }
+
+  /** @internal Throws TYPE_NOT_FOUND for an undeclared link type. */
+  _guardLink(type: string): void {
+    assertLinkType(this._guardSchema(), type);
+  }
+
+  /** @internal Throws INVALID_FILTER for a filter naming an undeclared field. */
+  _guardFilter(kind: 'object' | 'link', type: string, filter: FilterExpression | undefined): void {
+    assertFilterFields(this._guardSchema(), kind, type, filter);
+  }
+
+  /** Each step's link type, and its filter against the step's target type. */
+  private _guardPath(path: TraversalPath): void {
+    const schema = this._guardSchema();
+    for (const step of path.steps) {
+      assertLinkType(schema, step.linkType);
+      const def = schema?.linkTypes.find((t) => t.name === step.linkType);
+      if (def && step.filter) {
+        assertFilterFields(schema, 'object', step.direction === 'outbound' ? def.toType : def.fromType, step.filter);
+      }
+    }
   }
 
   // ─── Transactions ───
@@ -631,16 +688,19 @@ export class PostgresStorageProvider implements StorageProvider {
       tx,
       this._dataSchema,
       (linkType) => this._getLinkTypeDef(linkType),
+      this,
     );
   }
 
   // ─── Versioning ───
 
   async getObjectAtVersion(ctx: RequestContext, type: string, id: string, version: number): Promise<OntologyObject | null> {
+    this._guardObject(type);
     return withRetry(() => pgGetObjectAtVersion(this._pool, ctx, type, id, version, this._dataSchema));
   }
 
   async getObjectAtTime(ctx: RequestContext, type: string, id: string, timestamp: DateTime): Promise<OntologyObject | null> {
+    this._guardObject(type);
     return withRetry(() => pgGetObjectAtTime(this._pool, ctx, type, id, timestamp, this._dataSchema));
   }
 

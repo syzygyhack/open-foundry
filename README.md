@@ -136,9 +136,9 @@ GraphQL playground at `http://localhost:4000/graphql`, REST at
 - **Connect existing systems.** JDBC connectors and Debezium CDC, with overlay
   mode, conflict resolution and reconciliation.
 - **Swap the storage.** Everything persists through a storage SPI; PostgreSQL +
-  Apache AGE for production, in-memory for tests, both run against the same
-  conformance suite in CI (open Postgres divergences are declared in
-  `tests/spi-conformance/src/postgres-provider.test.ts`).
+  Apache AGE for production, in-memory for tests, both pass the same
+  conformance suite in CI (any divergence still open would be declared in
+  `tests/spi-conformance/src/postgres-provider.test.ts`; none is).
 - **Standard operational surface.** OpenTelemetry traces, Prometheus metrics,
   structured logs, a Helm chart with HPA, PDBs and network policies, and
   non-root containers.

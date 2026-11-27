@@ -36,6 +36,7 @@ import type {
   SearchResult,
   SearchHit,
 } from '@openfoundry/spi';
+import { assertObjectType, assertLinkType, assertFilterFields, systemFilterKey, SchemaGuardError } from '@openfoundry/spi';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,12 +82,20 @@ function evaluateFilter(obj: Record<string, unknown>, filter: FilterExpression):
 }
 
 function evaluateFieldPredicate(obj: Record<string, unknown>, pred: FieldPredicate): boolean {
-  const val = obj[pred.field];
+  // System fields may be named either way (_deleted_at, _deletedAt), as on
+  // Postgres, where both reach the same column.
+  // An absent field is null, as an unset or NULL column is on Postgres: a live
+  // object has no _deletedAt key, yet `_deleted_at eq null` must match it.
+  // Own keys only: an inherited name (constructor, __proto__) is unset.
+  const key = systemFilterKey(pred.field);
+  const raw = Object.hasOwn(obj, key) ? obj[key] : undefined;
+  const val = raw === undefined ? null : raw;
+  const want = pred.value === undefined ? null : pred.value;
   switch (pred.operator) {
     case 'eq':
-      return val === pred.value;
+      return val === want;
     case 'neq':
-      return val !== pred.value;
+      return val !== want;
     case 'gt':
       return typeof val === 'number' && typeof pred.value === 'number' && val > pred.value;
     case 'gte':
@@ -96,7 +105,7 @@ function evaluateFieldPredicate(obj: Record<string, unknown>, pred: FieldPredica
     case 'lte':
       return typeof val === 'number' && typeof pred.value === 'number' && val <= pred.value;
     case 'in':
-      return Array.isArray(pred.value) && (pred.value as unknown[]).includes(val);
+      return Array.isArray(pred.value) && (pred.value as unknown[]).some((v) => (v === undefined ? null : v) === val);
     case 'contains':
       return typeof val === 'string' && typeof pred.value === 'string' && val.includes(pred.value);
     case 'startsWith':
@@ -153,6 +162,7 @@ class MemoryTransaction implements Transaction {
   }
 
   async createObject(type: string, properties: Record<string, unknown>): Promise<OntologyObject> {
+    this._provider._guardObject(type);
     this.assertOpen();
     const obj = this._provider._doCreateObject(this._ctx, type, properties);
     this._journal.push({ op: 'createObject', key: `${type}:${obj._id}`, value: obj });
@@ -160,6 +170,7 @@ class MemoryTransaction implements Transaction {
   }
 
   async updateObject(type: string, id: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyObject> {
+    this._provider._guardObject(type);
     this.assertOpen();
     const prev = this._provider._getObjectInternal(this._ctx, type, id);
     if (!prev) throw new Error(`Object ${type}:${id} not found`);
@@ -169,6 +180,7 @@ class MemoryTransaction implements Transaction {
   }
 
   async deleteObject(type: string, id: string, mode: 'soft' | 'hard'): Promise<void> {
+    this._provider._guardObject(type);
     this.assertOpen();
     const prev = this._provider._getObjectInternal(this._ctx, type, id);
     if (!prev) throw new Error(`Object ${type}:${id} not found`);
@@ -188,6 +200,7 @@ class MemoryTransaction implements Transaction {
   }
 
   async createLink(type: string, fromId: string, toId: string, properties?: Record<string, unknown>): Promise<OntologyLink> {
+    this._provider._guardLink(type);
     this.assertOpen();
     const link = this._provider._doCreateLink(this._ctx, type, fromId, toId, properties);
     this._journal.push({ op: 'createLink', key: `${type}:${link._id}`, value: link });
@@ -195,6 +208,7 @@ class MemoryTransaction implements Transaction {
   }
 
   async updateLink(type: string, linkId: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyLink> {
+    this._provider._guardLink(type);
     this.assertOpen();
     const prev = this._provider._getLinkInternal(this._ctx, type, linkId);
     if (!prev) throw new Error(`Link ${type}:${linkId} not found`);
@@ -204,6 +218,7 @@ class MemoryTransaction implements Transaction {
   }
 
   async deleteLink(type: string, linkId: string): Promise<void> {
+    this._provider._guardLink(type);
     this.assertOpen();
     const prev = this._provider._getLinkInternal(this._ctx, type, linkId);
     if (!prev) throw new Error(`Link ${type}:${linkId} not found`);
@@ -640,10 +655,12 @@ export class MemoryStorageProvider implements StorageProvider {
   // ─── Objects ───
 
   async createObject(ctx: RequestContext, type: string, properties: Record<string, unknown>): Promise<OntologyObject> {
+    this._guardObject(type);
     return clone(this._doCreateObject(ctx, type, properties));
   }
 
   async getObject(ctx: RequestContext, type: string, id: string): Promise<OntologyObject | null> {
+    this._guardObject(type);
     const obj = this._getObjectInternal(ctx, type, id);
     if (!obj) return null;
     if (obj._deletedAt) return null;
@@ -651,10 +668,12 @@ export class MemoryStorageProvider implements StorageProvider {
   }
 
   async updateObject(ctx: RequestContext, type: string, id: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyObject> {
+    this._guardObject(type);
     return clone(this._doUpdateObject(ctx, type, id, properties, expectedVersion));
   }
 
   async deleteObject(ctx: RequestContext, type: string, id: string, mode: 'soft' | 'hard'): Promise<void> {
+    this._guardObject(type);
     if (mode === 'soft') {
       this._doSoftDeleteObject(ctx, type, id);
     } else {
@@ -663,6 +682,8 @@ export class MemoryStorageProvider implements StorageProvider {
   }
 
   async queryObjects(ctx: RequestContext, type: string, filter: FilterExpression, options?: QueryOptions): Promise<ObjectPage> {
+    this._guardObject(type);
+    this._guardFilter('object', type, filter);
     let items = Array.from(this._objects.values()).filter((obj) => {
       if (obj._tenantId !== ctx.tenantId) return false;
       if (obj._type !== type) return false;
@@ -701,12 +722,26 @@ export class MemoryStorageProvider implements StorageProvider {
   }
 
   async aggregateObjects(ctx: RequestContext, type: string, query: AggregateQuery): Promise<AggregateResult> {
+    this._guardObject(type);
+    this._guardFilter('object', type, query.filter);
     if (!query.fields || query.fields.length === 0) {
       throw new Error('Aggregate query must specify at least one field');
     }
     // Validate aggregate functions upfront (before grouping) so invalid
     // functions always throw, even when there are zero matching rows.
     const ALLOWED_FNS = new Set(['count', 'sum', 'avg', 'min', 'max']);
+    // Output names must be distinct (as on Postgres): results are keyed by
+    // them, and an orderBy names one.
+    const outputNames = new Set<string>();
+    for (const f of query.fields) {
+      const name = f.alias ?? `${f.fn}_${f.field}`;
+      if (outputNames.has(name)) {
+        throw new SchemaGuardError('VALIDATION_ERROR', `Aggregate output "${name}" is named twice`);
+      }
+      // Values are returned in a plain object, where this key sets the prototype.
+      if (name === '__proto__') throw new SchemaGuardError('VALIDATION_ERROR', 'Aggregate output may not be named __proto__');
+      outputNames.add(name);
+    }
     for (const aggField of query.fields) {
       if (!ALLOWED_FNS.has(aggField.fn.toLowerCase())) {
         throw new Error(`Invalid aggregate function: ${aggField.fn}`);
@@ -804,11 +839,23 @@ export class MemoryStorageProvider implements StorageProvider {
 
     // 4. Apply ordering
     if (query.orderBy && query.orderBy.length > 0) {
+      // A grouping key, else an aggregate output (as on Postgres); anything
+      // else is not part of the result and is refused.
+      const outputs = new Set(query.fields.map((f) => f.alias ?? `${f.fn}_${f.field}`));
+      const keyFields = new Set(query.groupBy ?? []);
+      for (const sort of query.orderBy) {
+        if (!keyFields.has(sort.field) && !outputs.has(sort.field)) {
+          throw new SchemaGuardError(
+            'VALIDATION_ERROR',
+            `Aggregate orderBy "${sort.field}" is neither a groupBy field nor an aggregate output`,
+          );
+        }
+      }
       for (const sort of [...query.orderBy].reverse()) {
+        const fromKeys = keyFields.has(sort.field);
         groups.sort((a, b) => {
-          // Check if the field is a group key or aggregate value
-          const aVal = (a.keys[sort.field] ?? a.values[sort.field]) as unknown;
-          const bVal = (b.keys[sort.field] ?? b.values[sort.field]) as unknown;
+          const aVal = (fromKeys ? a.keys[sort.field] : a.values[sort.field]) as unknown;
+          const bVal = (fromKeys ? b.keys[sort.field] : b.values[sort.field]) as unknown;
           if (aVal === bVal) return 0;
           if (aVal === undefined || aVal === null) return 1;
           if (bVal === undefined || bVal === null) return -1;
@@ -827,6 +874,8 @@ export class MemoryStorageProvider implements StorageProvider {
   }
 
   async searchObjects(ctx: RequestContext, type: string, query: SearchQuery): Promise<SearchResult> {
+    this._guardObject(type);
+    this._guardFilter('object', type, query.filter);
     // Guard against empty search queries (matches Postgres provider behavior)
     if (!query.query || query.query.trim().length === 0) {
       return { hits: [], totalCount: 0, hasNextPage: false };
@@ -959,10 +1008,12 @@ export class MemoryStorageProvider implements StorageProvider {
     toId: string,
     properties?: Record<string, unknown>,
   ): Promise<OntologyLink> {
+    this._guardLink(type);
     return clone(this._doCreateLink(ctx, type, fromId, toId, properties));
   }
 
   async getLink(ctx: RequestContext, type: string, linkId: string): Promise<OntologyLink | null> {
+    this._guardLink(type);
     const link = this._getLinkInternal(ctx, type, linkId);
     if (!link) return null;
     if (link._deletedAt) return null;
@@ -970,10 +1021,12 @@ export class MemoryStorageProvider implements StorageProvider {
   }
 
   async updateLink(ctx: RequestContext, type: string, linkId: string, properties: Record<string, unknown>, expectedVersion?: number): Promise<OntologyLink> {
+    this._guardLink(type);
     return clone(this._doUpdateLink(ctx, type, linkId, properties, expectedVersion));
   }
 
   async deleteLink(ctx: RequestContext, type: string, linkId: string): Promise<void> {
+    this._guardLink(type);
     this._doDeleteLink(ctx, type, linkId);
   }
 
@@ -1008,6 +1061,7 @@ export class MemoryStorageProvider implements StorageProvider {
     direction: 'inbound' | 'outbound',
     options?: QueryOptions,
   ): Promise<LinkPage> {
+    this._guardLink(linkType);
     const includeDeleted = options?.includeDeleted ?? false;
     let items = Array.from(this._links.values()).filter((link) => {
       if (link._tenantId !== ctx.tenantId) return false;
@@ -1052,6 +1106,7 @@ export class MemoryStorageProvider implements StorageProvider {
     path: TraversalPath,
     options?: TraversalOptions,
   ): Promise<TraversalResult> {
+    this._guardPath(path);
     // Match Postgres traversal safety limits (PERF-03)
     const MAX_TRAVERSAL_DEPTH = 10;
     const MAX_TRAVERSAL_NODES = 10_000;
@@ -1112,6 +1167,39 @@ export class MemoryStorageProvider implements StorageProvider {
     };
   }
 
+  // ─── Schema guards (unknown type / filter field) ───
+
+  private _guardSchema(): OntologySchema | undefined {
+    return this._currentSchemaVersion > 0 ? this._schemas.get(this._currentSchemaVersion) : undefined;
+  }
+
+  /** @internal Throws TYPE_NOT_FOUND for an undeclared object type. */
+  _guardObject(type: string): void {
+    assertObjectType(this._guardSchema(), type);
+  }
+
+  /** @internal Throws TYPE_NOT_FOUND for an undeclared link type. */
+  _guardLink(type: string): void {
+    assertLinkType(this._guardSchema(), type);
+  }
+
+  /** @internal Throws INVALID_FILTER for a filter naming an undeclared field. */
+  _guardFilter(kind: 'object' | 'link', type: string, filter: FilterExpression | undefined): void {
+    assertFilterFields(this._guardSchema(), kind, type, filter);
+  }
+
+  /** Each step's link type, and its filter against the step's target type. */
+  private _guardPath(path: TraversalPath): void {
+    const schema = this._guardSchema();
+    for (const step of path.steps) {
+      assertLinkType(schema, step.linkType);
+      const def = schema?.linkTypes.find((t) => t.name === step.linkType);
+      if (def && step.filter) {
+        assertFilterFields(schema, 'object', step.direction === 'outbound' ? def.toType : def.fromType, step.filter);
+      }
+    }
+  }
+
   // ─── Transactions ───
 
   async beginTransaction(ctx: RequestContext): Promise<Transaction> {
@@ -1121,6 +1209,7 @@ export class MemoryStorageProvider implements StorageProvider {
   // ─── Versioning ───
 
   async getObjectAtVersion(ctx: RequestContext, type: string, id: string, version: number): Promise<OntologyObject | null> {
+    this._guardObject(type);
     const key = `${type}:${id}`;
     const history = this._versionHistory.get(key);
     if (!history) return null;
@@ -1129,6 +1218,7 @@ export class MemoryStorageProvider implements StorageProvider {
   }
 
   async getObjectAtTime(ctx: RequestContext, type: string, id: string, timestamp: DateTime): Promise<OntologyObject | null> {
+    this._guardObject(type);
     const key = `${type}:${id}`;
     const history = this._versionHistory.get(key);
     if (!history) return null;

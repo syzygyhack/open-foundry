@@ -52,10 +52,12 @@ function fieldPredicateToSql(pred: FieldPredicate, offset: number): SqlFragment 
     // null: the memory provider's semantics. SQL's `= NULL` is never true and
     // `!= 'x'` is unknown, not true, for a NULL column.
     case 'eq':
-      if (pred.value === null) return { text: `${col} IS NULL`, params: [] };
+      // An omitted value is null too (the memory provider compares it as
+      // null; pg would bind undefined as NULL, and `= NULL` matches nothing).
+      if (pred.value === null || pred.value === undefined) return { text: `${col} IS NULL`, params: [] };
       return { text: `${col} = $${offset}`, params: [pred.value] };
     case 'neq':
-      return { text: `${col} IS DISTINCT FROM $${offset}`, params: [pred.value] };
+      return { text: `${col} IS DISTINCT FROM $${offset}`, params: [pred.value ?? null] };
     case 'gt':
       return { text: `${col} > $${offset}`, params: [pred.value] };
     case 'gte':
@@ -70,8 +72,14 @@ function fieldPredicateToSql(pred: FieldPredicate, offset: number): SqlFragment 
       if (!Array.isArray(arr) || arr.length === 0) {
         return { text: 'FALSE', params: [] };
       }
-      const placeholders = arr.map((_, i) => `$${offset + i}`).join(', ');
-      return { text: `${col} IN (${placeholders})`, params: [...arr] };
+      // A null member matches an unset column, as eq null does (SQL's
+      // `IN (NULL)` matches nothing).
+      const values = arr.filter((v) => v !== null && v !== undefined);
+      const hasNull = values.length < arr.length;
+      if (values.length === 0) return { text: `${col} IS NULL`, params: [] };
+      const placeholders = values.map((_, i) => `$${offset + i}`).join(', ');
+      const text = `${col} IN (${placeholders})`;
+      return { text: hasNull ? `(${text} OR ${col} IS NULL)` : text, params: [...values] };
     }
     case 'contains': {
       // Escape LIKE wildcards so they match literally

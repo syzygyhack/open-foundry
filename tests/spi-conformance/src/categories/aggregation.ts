@@ -223,6 +223,76 @@ export function registerAggregationTests(name: string, factory: ProviderFactory)
         }
       });
 
+      it('orders by an alias that is not a plain SQL name, with the values intact', async () => {
+        const result = await provider.aggregateObjects(tenantA, 'Patient', {
+          fields: [
+            { field: '*', fn: 'count', alias: '_total' },
+            { field: 'age', fn: 'max', alias: 'maxAge' },
+            { field: '*', fn: 'count' },
+          ],
+          groupBy: ['status'],
+          orderBy: [{ field: '_total', direction: 'desc' }],
+        });
+        expect(result.groups.map((g) => g.values['_total'])).toEqual([3, 1, 1]);
+        expect(result.groups[0]!.keys['status']).toBe('active');
+        expect(result.groups[0]!.values['maxAge']).toBe(35);
+        expect(result.groups[0]!.values['count_*']).toBe(3);
+
+        const byDefaultName = await provider.aggregateObjects(tenantA, 'Patient', {
+          fields: [{ field: '*', fn: 'count' }],
+          groupBy: ['status'],
+          orderBy: [{ field: 'count_*', direction: 'asc' }],
+        });
+        expect(byDefaultName.groups.map((g) => g.values['count_*'])).toEqual([1, 1, 3]);
+      });
+
+      it('sorts a null group key or value last, in either direction', async () => {
+        await provider.createObject(tenantA, 'Patient', { name: 'NoStatus' });
+        for (const direction of ['asc', 'desc'] as const) {
+          const byKey = await provider.aggregateObjects(tenantA, 'Patient', {
+            fields: [{ field: '*', fn: 'count', alias: 'n' }],
+            groupBy: ['status'],
+            orderBy: [{ field: 'status', direction }],
+          });
+          expect(byKey.groups.at(-1)!.keys['status'], direction).toBeNull();
+          const byValue = await provider.aggregateObjects(tenantA, 'Patient', {
+            fields: [{ field: 'score', fn: 'max', alias: 'top' }],
+            groupBy: ['status'],
+            orderBy: [{ field: 'top', direction }],
+          });
+          expect(byValue.groups.at(-1)!.values['top'], direction).toBeNull();
+        }
+      });
+
+      it('refuses an output named __proto__', async () => {
+        await expect(
+          provider.aggregateObjects(tenantA, 'Patient', { fields: [{ field: '*', fn: 'count', alias: '__proto__' }] }),
+        ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+      });
+
+      it('refuses two outputs with one name', async () => {
+        await expect(
+          provider.aggregateObjects(tenantA, 'Patient', {
+            fields: [
+              { field: '*', fn: 'count', alias: 'same' },
+              { field: 'score', fn: 'sum', alias: 'same' },
+            ],
+            groupBy: ['status'],
+            orderBy: [{ field: 'same', direction: 'desc' }],
+          }),
+        ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+      });
+
+      it('refuses an orderBy that is neither a groupBy field nor an aggregate output', async () => {
+        await expect(
+          provider.aggregateObjects(tenantA, 'Patient', {
+            fields: [{ field: '*', fn: 'count', alias: 'n' }],
+            groupBy: ['status'],
+            orderBy: [{ field: 'age', direction: 'asc' }],
+          }),
+        ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+      });
+
       it('orders groups by group key', async () => {
         const result = await provider.aggregateObjects(tenantA, 'Patient', {
           fields: [{ field: '*', fn: 'count', alias: 'count' }],

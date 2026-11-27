@@ -24,7 +24,16 @@ import type { ApiDependencies, ResolverContext } from '../graphql/types.js';
 import { DEFAULT_CONSENT_PURPOSE, DEFAULT_CONSENT_SUBJECT_TYPES, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../graphql/types.js';
 import type { RestRequest, RestResponse, RestRoute } from './types.js';
 import { createRestErrorResponse, wrapErrorToRest } from './errors.js';
-import { lowerFirst, toSnakeCase } from '../utils.js';
+import {
+  aggregateSortSourceFields,
+  lowerFirst,
+  mapPrimaryField,
+  mapPrimarySort,
+  restrictedFieldNames,
+  restrictedSearchFieldNames,
+  toSnakeCase,
+  visibleSearchFields,
+} from '../utils.js';
 import { paginateWithConsent } from '../consent-pagination.js';
 
 // ─── Helpers ───
@@ -46,14 +55,18 @@ function isParamField(field: FieldDefinition): boolean {
  * Used to enforce field-level authorization on filter predicates.
  */
 function collectFilterFields(filter: FilterExpression | undefined): string[] {
-  if (!filter) return [];
-  if ('field' in filter) return [(filter as { field: string }).field];
+  if (!filter || typeof filter !== 'object') return [];
+  // Every field the node or its branches name, whatever shape it has: storage
+  // reads a node with `field` but no `operator` as a logical node, so a
+  // `field` here must not hide the branches beside it from the check.
   const fields: string[] = [];
+  const node = filter as { field?: unknown };
+  if (typeof node.field === 'string') fields.push(node.field);
   const logical = filter as { and?: FilterExpression[]; or?: FilterExpression[]; not?: FilterExpression };
-  if (logical.and) {
+  if (Array.isArray(logical.and)) {
     for (const sub of logical.and) fields.push(...collectFilterFields(sub));
   }
-  if (logical.or) {
+  if (Array.isArray(logical.or)) {
     for (const sub of logical.or) fields.push(...collectFilterFields(sub));
   }
   if (logical.not) {
@@ -82,6 +95,7 @@ function objectToRest(obj: OntologyObject, objectType: ObjectType): Record<strin
 
   return result;
 }
+
 
 /**
  * Parse REST query params into a FilterExpression.
@@ -271,12 +285,23 @@ function generateListRoute(
           };
         }
 
-        const userFilter = parseQueryFilter(req.query);
+        // A field the type does not declare is rejected by storage with a
+        // non-retryable 400 INVALID_FILTER (it used to surface as a retryable
+        // 500 on Postgres and an empty page on the memory provider).
+        const parsedFilter = parseQueryFilter(req.query);
+        const userFilter = parsedFilter
+          ? mapPrimaryField(parsedFilter, obj.fields.find((f) => isPrimaryField(f))?.name)
+          : undefined;
 
         // SEC-14: Validate filter fields against redacted fields
         const visibleFields = deps.authorizationService.getVisibleFields(user.id, user.roles, typeName);
         if (visibleFields && userFilter) {
-          const filterViolations = collectFilterFields(userFilter).filter(f => !f.startsWith('_') && !visibleFields.has(f));
+          // The names the client sent (before the primary-field mapping).
+          const filterViolations = restrictedFieldNames(
+            collectFilterFields(parsedFilter),
+            visibleFields,
+            obj.fields.find((f) => isPrimaryField(f))?.name,
+          );
           if (filterViolations.length > 0) {
             return createRestErrorResponse({
               code: 'ACCESS_DENIED',
@@ -682,13 +707,19 @@ function generateAggregateRoute(
         // Check aggregate fields, groupBy, orderBy, and filter predicates
         const userFilter = body['filter'] as FilterExpression | undefined;
         const orderBy = body['orderBy'] as { field: string; direction: 'asc' | 'desc' }[] | undefined;
+        const fields: AggregateField[] = rawFields.map((f) => ({
+          field: f.field,
+          fn: f.fn.toLowerCase() as AggregateFunction,
+          alias: f.alias,
+        }));
         const visibleFields = deps.authorizationService.getVisibleFields(user.id, user.roles, typeName);
         if (visibleFields) {
           const allRequestedFields = [
             ...rawFields.filter(f => f.field !== '*').map(f => f.field),
             ...(groupBy ?? []),
             ...collectFilterFields(userFilter),
-            ...(orderBy ?? []).map(o => o.field),
+            // An output alias is not a field (its inputs are checked above).
+            ...aggregateSortSourceFields(orderBy, fields, obj.fields.map((f) => f.name)),
           ];
           const blocked = allRequestedFields.filter(f => !visibleFields.has(f));
           if (blocked.length > 0) {
@@ -702,17 +733,15 @@ function generateAggregateRoute(
           }
         }
 
-        const fields: AggregateField[] = rawFields.map((f) => ({
-          field: f.field,
-          fn: f.fn.toLowerCase() as AggregateFunction,
-          alias: f.alias,
-        }));
-        const combinedFilter = buildAuthFilter(allowedIds, userFilter);
+        const primary = obj.fields.find((f) => isPrimaryField(f))?.name;
+        const combinedFilter = buildAuthFilter(allowedIds, userFilter ? mapPrimaryField(userFilter, primary) : undefined);
 
         const query: AggregateQuery = {
           fields,
           groupBy,
           filter: combinedFilter,
+          // Not mapped: an aggregate orderBy names an output alias or a
+          // grouping key, which may be spelled like the primary field.
           orderBy,
           limit: body['limit'] as number | undefined,
           offset: body['offset'] as number | undefined,
@@ -781,7 +810,7 @@ function generateSearchRoute(
         // SEC-14: Validate search fields against redacted fields
         const visibleFields = deps.authorizationService.getVisibleFields(user.id, user.roles, typeName);
         if (visibleFields && fields) {
-          const searchViolations = fields.filter(f => !f.startsWith('_') && !visibleFields.has(f));
+          const searchViolations = restrictedSearchFieldNames(fields, visibleFields, obj.fields.find((f) => isPrimaryField(f))?.name);
           if (searchViolations.length > 0) {
             return createRestErrorResponse({
               code: 'ACCESS_DENIED',
@@ -797,7 +826,7 @@ function generateSearchRoute(
         // restrict search to visible fields only (prevents hidden field leakage).
         let searchFields = fields;
         if (!searchFields && visibleFields) {
-          searchFields = [...visibleFields].filter(f => !f.startsWith('_'));
+          searchFields = visibleSearchFields(visibleFields, obj.fields);
         }
 
         const { offset, limit } = parsePagination(req.query);
@@ -1161,6 +1190,27 @@ function generateObjectSetRoutes(schema: ParsedSchema, deps: ApiDependencies): R
             });
           }
 
+          // SEC-14: the saved filter and sort may not name fields this caller
+          // cannot see, as a list request's may not; checked on the names as
+          // saved, before the primary-field mapping below.
+          const visibleFields = deps.authorizationService.getVisibleFields(user.id, user.roles, def.objectType);
+          if (visibleFields) {
+            const violations = restrictedFieldNames(
+              [...collectFilterFields(def.filter), ...(def.orderBy ?? []).map((o) => o.field)],
+              visibleFields,
+              obj.fields.find((f) => isPrimaryField(f))?.name,
+            );
+            if (violations.length > 0) {
+              return createRestErrorResponse({
+                code: 'ACCESS_DENIED',
+                category: 'authorization',
+                message: `Cannot filter or sort on redacted fields: ${violations.join(', ')}`,
+                retryable: false,
+                traceId: ctx.requestContext.traceId,
+              });
+            }
+          }
+
           // Authorization: restrict results to authorized objects
           const fgaType = toSnakeCase(def.objectType);
           const allowedIds = await resolveAllowedIds(deps, user.id, fgaType);
@@ -1177,8 +1227,11 @@ function generateObjectSetRoutes(schema: ParsedSchema, deps: ApiDependencies): R
 
           const { offset, limit } = parsePagination(req.query);
 
-          // Inject auth filter into the object set's saved filter
-          const authFilter = buildAuthFilter(allowedIds, def.filter);
+          // Inject auth filter into the object set's saved filter (its primary
+          // field, e.g. id, is stored as _id; see mapPrimaryField)
+          const setPrimary = obj.fields.find((f) => isPrimaryField(f))?.name;
+          const authFilter = buildAuthFilter(allowedIds, def.filter ? mapPrimaryField(def.filter, setPrimary) : undefined);
+          const setOrderBy = mapPrimarySort(def.orderBy, setPrimary);
           const mapAndRedact = (objs: OntologyObject[]): Record<string, unknown>[] =>
             deps.authorizationService
               .redactFieldsBatch(
@@ -1206,7 +1259,7 @@ function generateObjectSetRoutes(schema: ParsedSchema, deps: ApiDependencies): R
               limit,
               async (windowLimit) => {
                 const scan = await deps.objectManager.query(
-                  def.objectType, authFilter, { limit: windowLimit, offset: 0, orderBy: def.orderBy }, ctx.requestContext,
+                  def.objectType, authFilter, { limit: windowLimit, offset: 0, orderBy: setOrderBy }, ctx.requestContext,
                 );
                 return { items: scan.items, total: scan.totalCount };
               },
@@ -1223,7 +1276,7 @@ function generateObjectSetRoutes(schema: ParsedSchema, deps: ApiDependencies): R
             hasNextPage = result.hasNextPage;
           } else {
             const page = await deps.objectManager.query(
-              def.objectType, authFilter, { limit, offset, orderBy: def.orderBy }, ctx.requestContext,
+              def.objectType, authFilter, { limit, offset, orderBy: setOrderBy }, ctx.requestContext,
             );
             items = mapAndRedact(page.items);
             totalCount = page.totalCount;
@@ -1314,7 +1367,12 @@ function generateObjectSetRoutes(schema: ParsedSchema, deps: ApiDependencies): R
               ...(def.aggregation.groupBy ?? []),
               ...collectFilterFields(def.filter),
               ...collectFilterFields(def.aggregation.filter),
-              ...(def.aggregation.orderBy ?? []).map(o => o.field),
+              // An output alias is not a field (its inputs are checked above).
+              ...aggregateSortSourceFields(
+                def.aggregation.orderBy,
+                def.aggregation.fields,
+                (schema.objectTypes.find((o) => o.name === def.objectType)?.fields ?? []).map((f) => f.name),
+              ),
             ];
             const blocked = allRequestedFields.filter(f => !visibleFields.has(f));
             if (blocked.length > 0) {
@@ -1330,10 +1388,13 @@ function generateObjectSetRoutes(schema: ParsedSchema, deps: ApiDependencies): R
 
           // Merge auth filter + saved filter into the aggregation query
           const aggregation = { ...def.aggregation };
-          const savedFilter = def.filter;
+          const setPrimary = schema.objectTypes
+            .find((o) => o.name === def.objectType)
+            ?.fields.find((f) => isPrimaryField(f))?.name;
+          const savedFilter = def.filter ? mapPrimaryField(def.filter, setPrimary) : undefined;
           const authFilter = buildAuthFilter(allowedIds, savedFilter);
           if (aggregation.filter) {
-            aggregation.filter = { and: [authFilter, aggregation.filter] };
+            aggregation.filter = { and: [authFilter, mapPrimaryField(aggregation.filter, setPrimary)] };
           } else {
             aggregation.filter = authFilter;
           }

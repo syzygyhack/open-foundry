@@ -80,22 +80,61 @@ are called out under **Breaking changes**.
 
 - **The SPI conformance suite now runs against the Postgres provider too.** It
   previously ran only against the in-memory provider, so nothing held the
-  production store to the contract it documents. CI's Postgres job now runs all
-  293 cases against `PostgresStorageProvider`, each test on its own data schema
-  (about 30 seconds). The fixtures now use ODL scalar names (`String`, `Int`,
-  ...) and give every link type the required `id` property that ODL requires.
-  With the lowercase names, Postgres had made every declared property a `TEXT`
-  column. Six cases still diverge: unknown type and unknown filter field
-  (Postgres throws, memory returns empty), unset link properties (`null` vs
-  absent), two `getObjectAtTime` timestamp cases, and a filtered traversal that
-  returns too many edges. They are declared with
-  `runConformanceSuite(name, factory, { knownFailures })`, each with a reason
-  and the error it is expected to fail with. They run, and each is reported as
+  production store to the contract it documents. CI's Postgres job now runs
+  every case against `PostgresStorageProvider`, each test on its own data
+  schema (about 30 seconds), and both providers pass all of them. The fixtures
+  now use ODL scalar names (`String`, `Int`, ...) and give every link type the
+  required `id` property that ODL requires. With the lowercase names, Postgres
+  had made every declared property a `TEXT` column. A divergence that cannot be
+  fixed at once can be declared with
+  `runConformanceSuite(name, factory, { knownFailures })`, with a reason and
+  the error it is expected to fail with. It still runs, and is reported as
   skipped only if it fails with that error. Any other failure fails the run, as
   does a declared case that starts passing. Registrations without
-  `knownFailures`, including third-party providers, get no exemptions.
+  `knownFailures`, including third-party providers, get no exemptions. The six
+  divergences first declared are fixed (see Fixed).
 
 ### Fixed
+
+- **Unknown types and filter fields are errors, the same on both providers.**
+  An undeclared object or link type is now `TYPE_NOT_FOUND` (REST 404) and a
+  filter naming an undeclared field `INVALID_FILTER` (REST 400, not retryable).
+  Before, the memory provider returned null or an empty page, and Postgres
+  threw a raw database error that the REST API reported as a retryable 500
+  with the Postgres error code. A missing object of a declared type still
+  reads as null. Where the API checks first, its answer comes first: a caller
+  with field restrictions gets 403 for a field outside its visible set, and a
+  caller who may see no objects of the type gets an empty 200. A filter or
+  sort on a type's primary field (REST `filter[id]=...`, GraphQL
+  `filter: {id: {eq: ...}}`, aggregate filters, saved object sets; list
+  sorts) now reaches storage as `_id`; it used to match nothing, and with the
+  new check would have been rejected. Field restrictions are still checked on
+  the name the client sent, and now also on a saved object set's filter and
+  sort when it is executed: that route checked none, so a caller could filter
+  or sort through a saved set on a field hidden from them. The check also
+  sees every branch of a filter node, whatever its shape, treats `_id` as the
+  type's primary field, and exempts only the platform's system fields
+  (`_createdAt`, `_deleted_at`, ...) rather than every name with a leading
+  underscore, which let a primary field such as `_recordId` through on REST
+  and GraphQL; REST also let named search fields with a leading underscore
+  through, `_id` included. GraphQL refuses such a list, search or filter as
+  `FORBIDDEN` (not retryable), as REST answers 403; it was a plain error,
+  reported as a retryable `INTERNAL_ERROR`. A search that names no fields, by a
+  caller with field restrictions, looks in the type's visible text properties
+  only (it could name the primary field, which is not a column). An
+  aggregate's `orderBy` is not renamed: it names
+  output aliases and grouping keys, and a caller with field restrictions may
+  now sort by an aggregate's own output (it was refused as a hidden field).
+  On both providers an aggregate `orderBy` must name a `groupBy` field or an
+  aggregate output, and two outputs may not share a name or be named
+  `__proto__` (`VALIDATION_ERROR` otherwise); Postgres sorted by an
+  alias such as `_total` or `totalCount` under a different name than it
+  selected it by, failing or sorting by a table column, and returned its
+  value as null. Nulls sort last in either direction on both providers
+  (PostgreSQL put them first in a descending sort). Both providers accept
+  system fields in
+  filters spelled either way (`_deletedAt` or `_deleted_at`); names inherited
+  from JavaScript objects (`constructor`, `__proto__`) are not fields.
 
 - **Traversal and link reads follow the soft-delete rules, on both
   providers.** Postgres ignored a traversal step's `filter` entirely, and
@@ -119,7 +158,11 @@ are called out under **Breaking changes**.
   `neq` and `not` silently dropped records whose field was unset (SQL compares
   NULL as unknown), and `eq null` matched nothing; the memory provider matched
   them. Postgres now follows the memory provider: `neq 'x'` and `not(eq 'x')`
-  match an unset field, and `eq null` matches exactly the unset ones.
+  match an unset field, `eq null` (or `eq` with the value left out) matches
+  exactly the unset ones, and `in` with a `null` member matches them too
+  (SQL's `IN (NULL)` matched nothing).
+  On the memory provider an absent field, such as `_deletedAt` on a live
+  object, now counts as null, as an unset column does on Postgres.
 
 - **Postgres: a property added to an existing type in a later schema version
   gets its column.** Object and link tables were created with `CREATE TABLE IF

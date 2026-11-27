@@ -50,6 +50,22 @@ export function registerQueryTests(name: string, factory: ProviderFactory): void
         expect(names(page.items)).toEqual(['Frank']);
       });
 
+      it('eq with the value omitted is eq null', async () => {
+        const page = await provider.queryObjects(tenantA, 'Patient', { field: 'status', operator: 'eq' } as FilterExpression);
+        expect(names(page.items)).toEqual(['Frank']);
+      });
+
+      it('in with a null member also matches an unset field', async () => {
+        const only = await provider.queryObjects(tenantA, 'Patient', { field: 'status', operator: 'in', value: [null] });
+        expect(names(only.items)).toEqual(['Frank']);
+        const mixed = await provider.queryObjects(tenantA, 'Patient', {
+          field: 'status',
+          operator: 'in',
+          value: [null, 'pending'],
+        });
+        expect(names(mixed.items).sort()).toEqual(['Eve', 'Frank']);
+      });
+
       it('eq on a value never matches an unset field', async () => {
         const page = await provider.queryObjects(tenantA, 'Patient', {
           or: [{ field: 'status', operator: 'eq', value: 'pending' }, { field: 'status', operator: 'eq', value: 'x' }],
@@ -93,9 +109,50 @@ export function registerQueryTests(name: string, factory: ProviderFactory): void
         expect(page.items).toHaveLength(0);
       });
 
-      it('on non-existent field returns empty', async () => {
-        const page = await provider.queryObjects(tenantA, 'Patient', { field: 'nonexistent', operator: 'eq', value: 'x' });
-        expect(page.items).toHaveLength(0);
+      it('rejects a filter on an undeclared field with INVALID_FILTER', async () => {
+        await expect(
+          provider.queryObjects(tenantA, 'Patient', { field: 'nonexistent', operator: 'eq', value: 'x' }),
+        ).rejects.toMatchObject({ code: 'INVALID_FILTER' });
+      });
+
+      it('rejects inherited JavaScript names as undeclared fields', async () => {
+        for (const field of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+          await expect(
+            provider.queryObjects(tenantA, 'Patient', { field, operator: 'eq', value: null }),
+            field,
+          ).rejects.toMatchObject({ code: 'INVALID_FILTER' });
+        }
+      });
+
+      it('rejects an undeclared field nested in and/or/not, and with no rows of the type', async () => {
+        const nested = {
+          and: [
+            { field: 'name', operator: 'eq', value: 'Alice' },
+            { not: { or: [{ field: 'nonexistent', operator: 'exists', value: false }] } },
+          ],
+        } as FilterExpression;
+        await expect(provider.queryObjects(tenantA, 'Patient', nested)).rejects.toMatchObject({ code: 'INVALID_FILTER' });
+        // Appointment has no rows here: the answer must not depend on data.
+        await expect(
+          provider.queryObjects(tenantA, 'Appointment', { field: 'nonexistent', operator: 'exists', value: false }),
+        ).rejects.toMatchObject({ code: 'INVALID_FILTER' });
+      });
+
+      it('accepts system fields in either spelling, on a live and a deleted row', async () => {
+        const live = await provider.createObject(tenantA, 'Patient', { name: 'SysLive' });
+        const gone = await provider.createObject(tenantA, 'Patient', { name: 'SysGone' });
+        await provider.deleteObject(tenantA, 'Patient', gone._id, 'soft');
+        const ids = { field: '_id', operator: 'in', value: [live._id, gone._id] } as FilterExpression;
+        const opts = { includeDeleted: true };
+        const run = async (f: FilterExpression) =>
+          (await provider.queryObjects(tenantA, 'Patient', { and: [ids, f] }, opts)).items.map((i) => i._id);
+        for (const field of ['_deletedAt', '_deleted_at']) {
+          expect(await run({ field, operator: 'exists', value: true })).toEqual([gone._id]);
+          expect(await run({ field, operator: 'exists', value: false })).toEqual([live._id]);
+          // An unset system field is null, as an unset property is.
+          expect(await run({ field, operator: 'eq', value: null })).toEqual([live._id]);
+          expect(await run({ field, operator: 'neq', value: null })).toEqual([gone._id]);
+        }
       });
     });
 

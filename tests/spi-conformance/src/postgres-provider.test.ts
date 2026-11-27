@@ -26,17 +26,10 @@ const PG_TEST_URL = process.env['PG_TEST_URL'];
 /**
  * Divergences from the contract still to be decided or fixed. Each runs; a
  * matching failure is reported as skipped, any other outcome fails the run.
+ * None are open: the six this file started with were all fixed. Declare new
+ * ones here rather than skipping them.
  */
-const knownFailures: KnownFailures = {
-  'CRUD > getObject > returns null for non-existent type': {
-    reason: 'Postgres throws (relation does not exist) where memory returns null; undecided which is the contract.',
-    error: /^relation "[^"]+\.non_existent_type" does not exist$/,
-  },
-  'Queries > filter: eq > on non-existent field returns empty': {
-    reason: 'Postgres throws (column does not exist) where memory returns no rows; undecided which is the contract.',
-    error: /^column "nonexistent" does not exist$/,
-  },
-};
+const knownFailures: KnownFailures = {};
 
 if (!PG_TEST_URL) {
   describe.skip('PostgresStorageProvider SPI conformance (PG_TEST_URL not set)', () => {});

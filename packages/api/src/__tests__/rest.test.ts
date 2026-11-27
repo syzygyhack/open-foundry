@@ -15,9 +15,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parseOdl } from '@openfoundry/odl';
 import type { ParsedSchema } from '@openfoundry/odl';
 import type { OntologyObject, ObjectPage, LinkPage } from '@openfoundry/spi';
+import { SchemaGuardError } from '@openfoundry/spi';
 import type { ActionResult } from '@openfoundry/actions';
 import { generateRestRoutes } from '../rest/route-generator.js';
-import { mapErrorToHttpStatus, createRestErrorResponse } from '../rest/errors.js';
+import { mapErrorToHttpStatus, createRestErrorResponse, wrapErrorToRest } from '../rest/errors.js';
 import type { RestRequest, RestRoute } from '../rest/types.js';
 import type { ApiDependencies, AuthenticatedUserInfo, ResolverContext } from '../graphql/types.js';
 
@@ -330,6 +331,45 @@ describe('REST API', () => {
       const filter = queryArgs[1];
       // Should include both auth filter and user filter
       expect(filter).toBeDefined();
+    });
+  });
+
+  describe('list filters and schema errors', () => {
+    it('a filter on the primary field reaches storage as _id', async () => {
+      const deps = createMockDeps(parsed);
+      (deps.authorizationService.listObjects as ReturnType<typeof vi.fn>).mockResolvedValue(['*']);
+      const queryMock = deps.objectManager.query as ReturnType<typeof vi.fn>;
+      queryMock.mockResolvedValue({ items: [], totalCount: 0, hasNextPage: false });
+
+      const route = findRoute(generateRestRoutes(parsed, deps), 'GET', '/api/v1/patients')!;
+      await route.handler(createMockRequest({ query: { 'filter[id]': 'p-1' } }), createResolverContext(deps));
+
+      const filter = JSON.stringify(queryMock.mock.calls[0]![1]);
+      expect(filter).toContain('"field":"_id","operator":"eq","value":"p-1"');
+      expect(filter).not.toContain('"field":"id"');
+    });
+
+    it('an undeclared filter field is a non-retryable 400 INVALID_FILTER', async () => {
+      const deps = createMockDeps(parsed);
+      (deps.authorizationService.listObjects as ReturnType<typeof vi.fn>).mockResolvedValue(['*']);
+      (deps.objectManager.query as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new SchemaGuardError('INVALID_FILTER', 'Filter on Patient names undeclared field(s): nope'),
+      );
+
+      const route = findRoute(generateRestRoutes(parsed, deps), 'GET', '/api/v1/patients')!;
+      const res = await route.handler(createMockRequest({ query: { 'filter[nope]': 'x' } }), createResolverContext(deps));
+
+      expect(res.status).toBe(400);
+      const error = (res.body as { error: { code: string; retryable: boolean; message: string } }).error;
+      expect(error.code).toBe('INVALID_FILTER');
+      expect(error.retryable).toBe(false);
+      expect(error.message).toContain('nope');
+    });
+
+    it('an unknown type from storage is a 404 TYPE_NOT_FOUND', async () => {
+      const res = wrapErrorToRest(new SchemaGuardError('TYPE_NOT_FOUND', 'Link type NoSuchLink is not declared'));
+      expect(res.status).toBe(404);
+      expect((res.body as { error: { retryable: boolean } }).error.retryable).toBe(false);
     });
   });
 

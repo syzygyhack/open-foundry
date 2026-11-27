@@ -100,3 +100,14 @@ export type {
   ObjectSetDefinition,
   ObjectSetStore,
 } from './object-set.js';
+
+// Schema guards shared by storage providers (unknown type / filter field)
+export {
+  SchemaGuardError,
+  SYSTEM_FILTER_FIELDS,
+  systemFilterKey,
+  assertObjectType,
+  assertLinkType,
+  assertFilterFields,
+  filterFields,
+} from './schema-guards.js';

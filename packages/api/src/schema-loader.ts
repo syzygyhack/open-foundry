@@ -723,7 +723,7 @@ function convertLinkType(linkType: LinkType): LinkTypeDefinition {
 /**
  * Convert a ParsedSchema to an OntologySchema suitable for storage.applySchema().
  */
-function toOntologySchema(parsed: ParsedSchema): OntologySchema {
+export function toOntologySchema(parsed: ParsedSchema): OntologySchema {
   return {
     version: 1,
     objectTypes: parsed.objectTypes.map(convertObjectType),
