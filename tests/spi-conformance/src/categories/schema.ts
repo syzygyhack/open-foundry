@@ -5,7 +5,8 @@
  * retrieval, versioning, migration, and error handling per the SPI spec.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, expect, beforeEach } from 'vitest';
+import { it } from '../known-failures.js';
 import type { StorageProvider, RequestContext, MigrationResult } from '@openfoundry/spi';
 import type { ProviderFactory } from '../suite.js';
 import { tenantA, baseSchema, schemaV2, schemaV3 } from '../fixtures.js';
@@ -130,12 +131,12 @@ export function registerSchemaTests(name: string, factory: ProviderFactory): voi
 
         const nameProperty = patient!.properties.find((p) => p.name === 'name');
         expect(nameProperty).toBeDefined();
-        expect(nameProperty!.type).toBe('string');
+        expect(nameProperty!.type).toBe('String');
         expect(nameProperty!.required).toBe(true);
 
         const ageProperty = patient!.properties.find((p) => p.name === 'age');
         expect(ageProperty).toBeDefined();
-        expect(ageProperty!.type).toBe('integer');
+        expect(ageProperty!.type).toBe('Int');
         // age is not required, so required should be falsy (undefined or false)
         expect(ageProperty!.required).toBeFalsy();
       });

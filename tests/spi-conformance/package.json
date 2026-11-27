@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@openfoundry/storage-memory": "workspace:*",
+    "@openfoundry/storage-postgres": "workspace:*",
     "vitest": "^5.1.0"
   }
 }

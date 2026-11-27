@@ -6,7 +6,8 @@
  * and monotonic version history tracking per the SPI spec (Section 3.1).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, expect, beforeEach } from 'vitest';
+import { it } from '../known-failures.js';
 import type { StorageProvider, RequestContext } from '@openfoundry/spi';
 import type { ProviderFactory } from '../suite.js';
 import { tenantA, baseSchema } from '../fixtures.js';

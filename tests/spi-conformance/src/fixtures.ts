@@ -16,55 +16,64 @@ export const tenantC: RequestContext = { tenantId: 'conformance-tenant-c', actor
 // Schemas
 // ---------------------------------------------------------------------------
 
-/** Base schema used across most conformance tests. */
+/**
+ * Base schema used across most conformance tests.
+ *
+ * Written as the ODL loader would produce it: ODL scalar names (String, Int,
+ * Float, Boolean) and a required `id: ID` property on every link type (ODL rule
+ * 11 requires `id: ID! @primary` on a LinkType). The Postgres provider maps
+ * property columns from these names and falls back to TEXT for names it does
+ * not know, so lowercase names made every declared property a TEXT column. Its
+ * link tables have an `id` column only when the link type declares one.
+ */
 export const baseSchema: OntologySchema = {
   version: 1,
   objectTypes: [
     {
       name: 'Patient',
       properties: [
-        { name: 'name', type: 'string', required: true },
-        { name: 'age', type: 'integer' },
-        { name: 'status', type: 'string' },
-        { name: 'email', type: 'string' },
-        { name: 'score', type: 'float' },
-        { name: 'active', type: 'boolean' },
-        { name: 'tags', type: 'string' },
-        { name: 'nhsNumber', type: 'string' },
+        { name: 'name', type: 'String', required: true },
+        { name: 'age', type: 'Int' },
+        { name: 'status', type: 'String' },
+        { name: 'email', type: 'String' },
+        { name: 'score', type: 'Float' },
+        { name: 'active', type: 'Boolean' },
+        { name: 'tags', type: 'String' },
+        { name: 'nhsNumber', type: 'String' },
       ],
     },
     {
       name: 'CareTeam',
       properties: [
-        { name: 'name', type: 'string', required: true },
-        { name: 'specialty', type: 'string' },
-        { name: 'capacity', type: 'integer' },
+        { name: 'name', type: 'String', required: true },
+        { name: 'specialty', type: 'String' },
+        { name: 'capacity', type: 'Int' },
       ],
     },
     {
       name: 'Appointment',
       properties: [
-        { name: 'date', type: 'string' },
-        { name: 'duration', type: 'integer' },
-        { name: 'status', type: 'string' },
-        { name: 'notes', type: 'string' },
+        { name: 'date', type: 'String' },
+        { name: 'duration', type: 'Int' },
+        { name: 'status', type: 'String' },
+        { name: 'notes', type: 'String' },
       ],
     },
     {
       name: 'Medication',
       properties: [
-        { name: 'name', type: 'string', required: true },
-        { name: 'dosage', type: 'string' },
-        { name: 'frequency', type: 'string' },
+        { name: 'name', type: 'String', required: true },
+        { name: 'dosage', type: 'String' },
+        { name: 'frequency', type: 'String' },
       ],
     },
     {
       name: 'Observation',
       properties: [
-        { name: 'code', type: 'string', required: true },
-        { name: 'value', type: 'float' },
-        { name: 'unit', type: 'string' },
-        { name: 'recordedAt', type: 'string' },
+        { name: 'code', type: 'String', required: true },
+        { name: 'value', type: 'Float' },
+        { name: 'unit', type: 'String' },
+        { name: 'recordedAt', type: 'String' },
       ],
     },
   ],
@@ -74,19 +83,21 @@ export const baseSchema: OntologySchema = {
       fromType: 'Patient',
       toType: 'CareTeam',
       cardinality: 'MANY_TO_MANY',
-      properties: [{ name: 'role', type: 'string' }],
+      properties: [{ name: 'id', type: 'ID', required: true }, { name: 'role', type: 'String' }],
     },
     {
       name: 'PrimaryDoctor',
       fromType: 'Patient',
       toType: 'CareTeam',
       cardinality: 'ONE_TO_ONE',
+      properties: [{ name: 'id', type: 'ID', required: true }],
     },
     {
       name: 'HasAppointment',
       fromType: 'Patient',
       toType: 'Appointment',
       cardinality: 'ONE_TO_MANY',
+      properties: [{ name: 'id', type: 'ID', required: true }],
     },
     {
       name: 'Prescribes',
@@ -94,8 +105,9 @@ export const baseSchema: OntologySchema = {
       toType: 'Medication',
       cardinality: 'MANY_TO_MANY',
       properties: [
-        { name: 'prescribedAt', type: 'string' },
-        { name: 'reason', type: 'string' },
+        { name: 'id', type: 'ID', required: true },
+        { name: 'prescribedAt', type: 'String' },
+        { name: 'reason', type: 'String' },
       ],
     },
     {
@@ -103,12 +115,14 @@ export const baseSchema: OntologySchema = {
       fromType: 'Patient',
       toType: 'Observation',
       cardinality: 'ONE_TO_MANY',
+      properties: [{ name: 'id', type: 'ID', required: true }],
     },
     {
       name: 'TeamLead',
       fromType: 'CareTeam',
       toType: 'CareTeam',
       cardinality: 'ONE_TO_ONE',
+      properties: [{ name: 'id', type: 'ID', required: true }],
     },
   ],
 };
@@ -121,9 +135,9 @@ export const schemaV2: OntologySchema = {
     {
       name: 'Referral',
       properties: [
-        { name: 'reason', type: 'string', required: true },
-        { name: 'urgency', type: 'string' },
-        { name: 'status', type: 'string' },
+        { name: 'reason', type: 'String', required: true },
+        { name: 'urgency', type: 'String' },
+        { name: 'status', type: 'String' },
       ],
     },
   ],
@@ -134,6 +148,7 @@ export const schemaV2: OntologySchema = {
       fromType: 'Referral',
       toType: 'CareTeam',
       cardinality: 'MANY_TO_MANY',
+      properties: [{ name: 'id', type: 'ID', required: true }],
     },
   ],
 };
@@ -149,6 +164,7 @@ export const schemaV3: OntologySchema = {
       fromType: 'CareTeam',
       toType: 'CareTeam',
       cardinality: 'ONE_TO_MANY',
+      properties: [{ name: 'id', type: 'ID', required: true }],
     },
   ],
 };

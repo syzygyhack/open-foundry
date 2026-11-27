@@ -82,6 +82,14 @@ jobs:
         env:
           PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/openfoundry_test
         run: pnpm --filter @openfoundry/storage-postgres test
+      # The SPI conformance suite against Postgres: the same contract the memory
+      # provider is held to. Divergences still to be decided are listed in
+      # tests/spi-conformance/src/known-failures.ts and reported as skipped; a
+      # listed one that starts passing fails the run so the entry gets removed.
+      - name: SPI conformance (Postgres provider)
+        env:
+          PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/openfoundry_test
+        run: pnpm --filter @openfoundry/spi-conformance test
 
   # Build the service images once and share them, rather than letting each
   # consumer rebuild. Three jobs previously built the same six images in

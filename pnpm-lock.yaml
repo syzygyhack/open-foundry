@@ -456,6 +456,9 @@ importers:
       '@openfoundry/storage-memory':
         specifier: workspace:*
         version: link:../../packages/storage-memory
+      '@openfoundry/storage-postgres':
+        specifier: workspace:*
+        version: link:../../packages/storage-postgres
       vitest:
         specifier: ^5.1.0
         version: 5.1.2(@opentelemetry/api@1.10.0)(@types/node@25.2.2)(vite@7.3.8(@types/node@25.2.2)(tsx@4.23.15)(yaml@2.9.1))

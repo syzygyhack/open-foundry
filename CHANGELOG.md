@@ -78,6 +78,23 @@ are called out under **Breaking changes**.
   positionally, as 2.x did, still compiles under the test runner, which strips
   types, but exports nothing; typecheck is what caught it.
 
+- **The SPI conformance suite now runs against the Postgres provider too.** It
+  previously ran only against the in-memory provider, so nothing held the
+  production store to the contract it documents. CI's Postgres job now runs all
+  293 cases against `PostgresStorageProvider`, each test on its own data schema
+  (about 30 seconds). The fixtures now use ODL scalar names (`String`, `Int`,
+  ...) and give every link type the required `id` property that ODL requires.
+  With the lowercase names, Postgres had made every declared property a `TEXT`
+  column. Six cases still diverge: unknown type and unknown filter field
+  (Postgres throws, memory returns empty), unset link properties (`null` vs
+  absent), two `getObjectAtTime` timestamp cases, and a filtered traversal that
+  returns too many edges. They are declared with
+  `runConformanceSuite(name, factory, { knownFailures })`, each with a reason
+  and the error it is expected to fail with. They run, and each is reported as
+  skipped only if it fails with that error. Any other failure fails the run, as
+  does a declared case that starts passing. Registrations without
+  `knownFailures`, including third-party providers, get no exemptions.
+
 ### Fixed
 
 - **The Postgres provider no longer leaves pooled connections pointed at

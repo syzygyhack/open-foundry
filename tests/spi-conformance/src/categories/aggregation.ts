@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, expect, beforeEach } from 'vitest';
+import { it } from '../known-failures.js';
 import type { StorageProvider } from '@openfoundry/spi';
 import type { ProviderFactory } from '../suite.js';
 import { tenantA, baseSchema } from '../fixtures.js';
