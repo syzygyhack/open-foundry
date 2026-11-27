@@ -2,6 +2,9 @@
  * Maps ODL/SPI property types to PostgreSQL column types.
  */
 
+import type { OntologySchema } from '@openfoundry/spi';
+import { SchemaGuardError } from '@openfoundry/spi';
+
 const ODL_TO_PG: Record<string, string> = {
   // Scalars
   String: 'TEXT',
@@ -79,6 +82,58 @@ export function pgIdentName(name: string): string {
     .replace(/([A-Z])/g, '_$1')
     .toLowerCase()
     .replace(/^_/, '');
+}
+
+const NAME_MAX_BYTES = 63; // NAMEDATALEN - 1
+
+/**
+ * The name PostgreSQL stores for an identifier: cut to 63 bytes, at a
+ * character boundary. A history table of a type whose name is near the limit
+ * ("<table>_history") is stored truncated, and must be matched that way.
+ */
+export function pgStoredName(name: string): string {
+  const bytes = Buffer.from(name, 'utf8');
+  if (bytes.length <= NAME_MAX_BYTES) return name;
+  let end = NAME_MAX_BYTES;
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
+  return bytes.subarray(0, end).toString('utf8');
+}
+/**
+ * The name PostgreSQL stores for an identifier the DDL writes as
+ * pgIdent(name): pgIdentName, then cut to 63 bytes. Code that looks a table,
+ * column or schema up in the catalog by name must use this, not snakeCase:
+ * `_Ward` is stored as "ward", and a long name is stored truncated.
+ */
+export function physicalName(name: string): string {
+  return pgStoredName(pgIdentName(name));
+}
+
+/**
+ * Throws VALIDATION_ERROR if two of the schema's tables would get the same
+ * stored name: two types that differ only in what pgIdentName drops (`Ward`
+ * and `_Ward`), or a type name long enough that PostgreSQL's 63-byte cut
+ * makes its table and its history table one table (every write then failed
+ * on a duplicate key in the history insert).
+ */
+export function assertDistinctPhysicalNames(schema: OntologySchema): void {
+  const owners = new Map<string, string>();
+  const claim = (table: string, owner: string): void => {
+    const stored = physicalName(table);
+    const other = owners.get(stored);
+    if (other !== undefined) {
+      throw new SchemaGuardError(
+        'VALIDATION_ERROR',
+        `${owner} and ${other} would both be stored as table "${stored}" ` +
+          '(PostgreSQL drops a leading underscore here and cuts names to 63 bytes); rename one',
+      );
+    }
+    owners.set(stored, owner);
+  };
+  for (const t of schema.objectTypes) {
+    claim(snakeCase(t.name), `object type ${t.name}`);
+    claim(snakeCase(t.name) + '_history', `the history of object type ${t.name}`);
+  }
+  for (const t of schema.linkTypes) claim(snakeCase(t.name), `link type ${t.name}`);
 }
 
 /**

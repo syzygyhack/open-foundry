@@ -13,7 +13,7 @@ import type {
   SearchHit,
   OntologyObject,
 } from '@openfoundry/spi';
-import { snakeCase, pgIdent, fieldCol } from '../schema/type-mapping.js';
+import { snakeCase, pgIdent, fieldCol, physicalName } from '../schema/type-mapping.js';
 import { filterToSql } from './filter-to-sql.js';
 import { PgTransaction, resolveQueryable } from '../transactions/index.js';
 
@@ -94,7 +94,10 @@ export async function searchObjects(
 
   // Determine which fields to search
   let searchFields: string[];
-  if (query.fields && query.fields.length > 0) {
+  if (query.fields !== undefined && query.fields !== null) {
+    // An explicit list, even an empty one (a caller allowed to search no
+    // field): only those fields, as on the memory provider. Only when no list
+    // is given are the table's text columns discovered.
     searchFields = query.fields;
   } else {
     // Search all non-system columns. We query the column list from the table.
@@ -106,7 +109,8 @@ export async function searchObjects(
        WHERE table_schema = $1 AND table_name = $2
        AND data_type IN ('text', 'character varying')
        AND column_name NOT LIKE '\\_%' ESCAPE '\\'`,
-      [schema, snakeCase(type)],
+      // Catalog names: as the DDL stored them (see physicalName).
+      [physicalName(schema), physicalName(snakeCase(type))],
     );
     searchFields = (colResult.rows as Array<{ column_name: string }>).map((r) =>
       r.column_name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),

@@ -70,7 +70,9 @@ describe('planColumns', () => {
     const plan = await planColumns(q, ontology, 'public');
 
     expect(plan).toHaveLength(2);
-    expect(plan.filter((s) => s.includes('_history'))).toHaveLength(1);
+    // One ALTER for each table, by the names PostgreSQL stored.
+    expect(plan.filter((s) => s.includes(`"${stored}"`))).toHaveLength(1);
+    expect(plan.filter((s) => s.includes(`"${table}"`))).toHaveLength(1);
     expect(plan.every((s) => s.includes('"colour"'))).toBe(true);
   });
 });

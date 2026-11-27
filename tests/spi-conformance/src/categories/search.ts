@@ -112,6 +112,19 @@ export function registerSearchTests(name: string, factory: ProviderFactory): voi
         // "hospital" appears in email for Charlie and Eve
         expect(result.hits.length).toBeGreaterThanOrEqual(2);
       });
+
+      it('searches only the fields listed, and none for an empty list', async () => {
+        const inName = await provider.searchObjects(tenantA, 'Patient', { query: 'hospital', fields: ['name'] });
+        expect(inName.hits).toHaveLength(0);
+        // An empty list is a caller allowed to search no field (the API sends
+        // it when field restrictions leave nothing searchable).
+        const none = await provider.searchObjects(tenantA, 'Patient', { query: 'hospital', fields: [] });
+        expect(none.hits).toHaveLength(0);
+        expect(none.totalCount).toBe(0);
+        // null is no list (GraphQL passes it for an explicit `fields: null`).
+        const omitted = await provider.searchObjects(tenantA, 'Patient', { query: 'hospital', fields: null } as never);
+        expect(omitted.hits.length).toBeGreaterThanOrEqual(2);
+      });
     });
 
     // ─── Search with filter ───

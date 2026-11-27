@@ -42,7 +42,7 @@ import { assertObjectType, assertLinkType, assertFilterFields } from '@openfound
 // ─── Module imports ───
 import { createLogger } from '@openfoundry/observability';
 import { generateDDL } from './schema/index.js';
-import { pgIdent, snakeCase, pgIndexMethod } from './schema/type-mapping.js';
+import { pgIdent, snakeCase, pgIndexMethod, physicalName, assertDistinctPhysicalNames } from './schema/type-mapping.js';
 import { planColumns, reconcileColumns } from './schema/ddl-reconcile.js';
 import {
   createObject as pgCreateObject,
@@ -167,6 +167,26 @@ class PgSpiTransaction implements Transaction {
 // PostgresStorageProvider
 // ---------------------------------------------------------------------------
 
+/**
+ * Names for an index ensureIndex makes on one field: the name it uses now,
+ * then the name earlier releases used, if different. The base name is
+ * `uq_<table>_<field>` or `idx_<table>_<field>_<method>`; one over PostgreSQL's
+ * 63 bytes is cut short and given a hash of the whole name, where earlier
+ * releases let PostgreSQL cut it, so two fields' indexes (or a field's and
+ * the history table's lookup index) could get one name, and CREATE INDEX IF
+ * NOT EXISTS then made nothing.
+ */
+export function indexNames(type: string, field: string, kind: 'unique' | string): string[] {
+  const base =
+    kind === 'unique' ? `uq_${snakeCase(type)}_${snakeCase(field)}` : `idx_${snakeCase(type)}_${snakeCase(field)}_${kind}`;
+  if (Buffer.byteLength(base, 'utf8') <= 63) return [base];
+  const hash = createHash('sha256').update(base).digest('hex').slice(0, 12);
+  const head = Buffer.from(base, 'utf8');
+  let end = 50;
+  while (end > 0 && (head[end]! & 0xc0) === 0x80) end--;
+  return [`${head.subarray(0, end).toString('utf8')}_${hash}`, base];
+}
+
 export class PostgresStorageProvider implements StorageProvider {
   private _pool: Pool;
   private _dataSchema: string;
@@ -272,6 +292,12 @@ export class PostgresStorageProvider implements StorageProvider {
         const now = new Date().toISOString() as DateTime;
         return { success: true, fromVersion, toVersion: schema.version, appliedAt: now };
       }
+    } else {
+      // A new version may not give two tables one stored name. Checked only
+      // here: a version already applied keeps starting, even if it has such
+      // a pair (two types differing by a leading underscore shared one table,
+      // which worked while their columns matched).
+      assertDistinctPhysicalNames(schema);
     }
 
     // Use a dedicated client for the entire migration to ensure advisory lock
@@ -710,38 +736,66 @@ export class PostgresStorageProvider implements StorageProvider {
     const table = `${pgIdent(this._dataSchema)}.${pgIdent(snakeCase(type))}`;
     const column = pgIdent(snakeCase(index.field));
     const method = pgIndexMethod(index.indexType);
-    const snakeType = snakeCase(type);
-    const snakeField = snakeCase(index.field);
+    const [name, legacy] = indexNames(type, index.field, index.unique ? 'unique' : method);
+
+    // An index an earlier release made under the name PostgreSQL cut is the
+    // same index: keep it rather than add a second under the hashed name.
+    if (legacy !== undefined) {
+      const existing = await this._indexesOn(type, index.field, [legacy]);
+      const unique = Boolean(index.unique);
+      // Only a valid, complete (not partial) index on the plain column is the
+      // same index; an invalid one (a failed CREATE INDEX CONCURRENTLY) or a
+      // partial one does not stand in for it.
+      if (existing.some((x) => x.usable && x.unique === unique && (unique || x.method === method))) return;
+    }
 
     if (index.unique) {
-      const indexName = `"uq_${snakeType}_${snakeField}"`;
-      await this._pool.query(
-        `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON ${table} (${column})`,
-      );
+      await this._pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "${name}" ON ${table} (${column})`);
     } else {
-      const indexName = `"idx_${snakeType}_${snakeField}_${method}"`;
-      await this._pool.query(
-        `CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} USING ${method} (${column})`,
-      );
+      await this._pool.query(`CREATE INDEX IF NOT EXISTS "${name}" ON ${table} USING ${method} (${column})`);
     }
   }
 
   async dropIndex(_ctx: RequestContext, type: string, field: string): Promise<void> {
-    const snakeType = snakeCase(type);
-    const snakeField = snakeCase(field);
-    // Try dropping both unique and regular index names
-    await this._pool.query(`DROP INDEX IF EXISTS ${pgIdent(this._dataSchema)}."uq_${snakeType}_${snakeField}"`);
-    await this._pool.query(`DROP INDEX IF EXISTS ${pgIdent(this._dataSchema)}."idx_${snakeType}_${snakeField}_btree"`);
-    await this._pool.query(`DROP INDEX IF EXISTS ${pgIdent(this._dataSchema)}."idx_${snakeType}_${snakeField}_hash"`);
-    await this._pool.query(`DROP INDEX IF EXISTS ${pgIdent(this._dataSchema)}."idx_${snakeType}_${snakeField}_gin"`);
-    await this._pool.query(`DROP INDEX IF EXISTS ${pgIdent(this._dataSchema)}."idx_${snakeType}_${snakeField}_gist"`);
+    // Every name ensureIndex gives (or gave) an index on this field, but only
+    // indexes that really are on this table and column: a name over 63 bytes
+    // was cut by PostgreSQL, and the cut name can be another index's.
+    const candidates = (['unique', 'btree', 'hash', 'gin', 'gist'] as const).flatMap((m) => indexNames(type, field, m));
+    for (const { name } of await this._indexesOn(type, field, candidates)) {
+      await this._pool.query(`DROP INDEX IF EXISTS ${pgIdent(this._dataSchema)}."${name.replace(/"/g, '""')}"`);
+    }
+  }
+
+  /**
+   * Single-column, non-primary indexes on the type's table and the field's
+   * column whose stored name is one of `names` (cut as PostgreSQL cuts).
+   */
+  private async _indexesOn(
+    type: string,
+    field: string,
+    names: string[],
+  ): Promise<Array<{ name: string; unique: boolean; method: string; usable: boolean }>> {
+    const found = await this._pool.query<{ name: string; unique: boolean; method: string; usable: boolean }>(
+      `SELECT i.relname AS name, x.indisunique AS unique, am.amname AS method,
+              (x.indisvalid AND x.indisready AND x.indislive AND x.indpred IS NULL AND x.indexprs IS NULL) AS usable
+         FROM pg_index x
+         JOIN pg_class i ON i.oid = x.indexrelid
+         JOIN pg_class t ON t.oid = x.indrelid
+         JOIN pg_am am ON am.oid = i.relam
+        WHERE t.relnamespace = to_regnamespace($1) AND t.relname = $2
+          AND NOT x.indisprimary AND x.indnatts = 1
+          AND (SELECT a.attname FROM pg_attribute a WHERE a.attrelid = t.oid AND a.attnum = x.indkey[0]) = $3
+          AND i.relname = ANY($4)`,
+      [pgIdent(this._dataSchema), physicalName(snakeCase(type)), physicalName(snakeCase(field)), names.map(physicalName)],
+    );
+    return found.rows;
   }
 
   async listIndexes(_ctx: RequestContext, type: string): Promise<IndexDefinition[]> {
-    const tableName = snakeCase(type);
+    // Catalog names: as the DDL stored them (see physicalName).
     const result = await this._pool.query(
       `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1 AND tablename = $2`,
-      [this._dataSchema, tableName],
+      [physicalName(this._dataSchema), physicalName(snakeCase(type))],
     );
     const indexes: IndexDefinition[] = [];
     for (const row of result.rows) {

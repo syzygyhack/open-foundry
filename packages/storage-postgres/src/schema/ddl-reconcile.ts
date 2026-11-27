@@ -19,7 +19,9 @@
 
 import type { OntologySchema, PropertyDefinition } from '@openfoundry/spi';
 import type { Queryable } from '../transactions/index.js';
-import { pgIdent, pgIdentName, pgType, snakeCase } from './type-mapping.js';
+import { pgIdent, pgType, snakeCase, physicalName, pgStoredName } from './type-mapping.js';
+
+export { pgStoredName };
 
 function literal(value: unknown): string {
   if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
@@ -38,20 +40,6 @@ function addColumn(schema: string, table: string, prop: PropertyDefinition, with
   );
 }
 
-const NAME_MAX_BYTES = 63; // NAMEDATALEN - 1
-
-/**
- * The name PostgreSQL stores for an identifier: cut to 63 bytes, at a
- * character boundary. A history table of a type whose name is near the limit
- * ("<table>_history") is stored truncated, and must be matched that way.
- */
-export function pgStoredName(name: string): string {
-  const bytes = Buffer.from(name, 'utf8');
-  if (bytes.length <= NAME_MAX_BYTES) return name;
-  let end = NAME_MAX_BYTES;
-  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
-  return bytes.subarray(0, end).toString('utf8');
-}
 
 /**
  * The ALTER statements that would add the missing columns, without running
@@ -77,9 +65,9 @@ export async function planColumns(
 
   const wanted: Array<{ table: string; prop: PropertyDefinition; withDefault: boolean }> = [];
   for (const type of ontology.objectTypes) {
-    // The names the DDL gives them: pgIdent over snakeCase (see pgIdentName).
-    const table = pgIdentName(snakeCase(type.name));
-    const history = pgIdentName(snakeCase(type.name) + '_history');
+    // The names the DDL gives them (see physicalName).
+    const table = physicalName(snakeCase(type.name));
+    const history = physicalName(snakeCase(type.name) + '_history');
     for (const prop of type.properties) {
       // Object tables carry defaults; their history tables mirror the columns.
       wanted.push({ table, prop, withDefault: true });
@@ -88,14 +76,14 @@ export async function planColumns(
   }
   for (const type of ontology.linkTypes) {
     // Link tables are created without defaults; keep added columns the same.
-    const table = pgIdentName(snakeCase(type.name));
+    const table = physicalName(snakeCase(type.name));
     for (const prop of type.properties ?? []) wanted.push({ table, prop, withDefault: false });
   }
 
   const plan: string[] = [];
   for (const { table, prop, withDefault } of wanted) {
-    const have = columns.get(pgStoredName(table));
-    const column = pgStoredName(pgIdentName(snakeCase(prop.name)));
+    const have = columns.get(table);
+    const column = physicalName(snakeCase(prop.name));
     // A table that does not exist is the migration's to create, not ours.
     if (!have || have.has(column)) continue;
     plan.push(addColumn(dataSchema, table, prop, withDefault));

@@ -189,6 +189,25 @@ are called out under **Breaking changes**.
   storage providers removed the object (and its history) but left every link
   from or to it, with its properties: traversal from the deleted ID still
   worked, and a one-to-one or many-to-one link kept the surviving endpoint's
+- **Postgres: catalog lookups use the names the tables were created with.**
+  The DDL drops a leading underscore from a type's table name (`_Ward` is
+  table `ward`) and PostgreSQL cuts names to 63 bytes, but search's column
+  discovery and `listIndexes` looked tables up by the uncut, unchanged name
+  and found nothing. `ensureIndex` names an index whose name would exceed 63
+  bytes with a hash instead of letting PostgreSQL cut it (the cut name could
+  be another index's, and the index was then silently not made), and
+  `dropIndex` only drops an index that is on that table and column (it could
+  drop the history table's lookup index). `applySchema` refuses a schema in
+  which two tables would get one stored name: two types that differ only by a
+  leading underscore, or a type name so long that its table and its history
+  table are cut to the same name (every write to such a type failed). A
+  version applied before this check keeps starting; only new versions are
+  checked. A valid, complete index an earlier release made under a cut name
+  is kept rather than duplicated. A search with an empty field list (what the GraphQL API
+  sends when field restrictions leave nothing searchable) searched every text
+  column on Postgres, hidden ones included; it now searches none, as on the
+  memory provider.
+
   slot. Hard delete is meant for data-retention compliance, so the leftover
   links kept exactly the data it should remove. It now removes all of the
   object's links, live and soft-deleted, in the same transaction, and rolling
