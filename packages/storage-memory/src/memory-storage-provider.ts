@@ -361,17 +361,39 @@ export class MemoryStorageProvider implements StorageProvider {
 
   // ─── Internal mutation methods (used by provider + transaction) ───
 
+  /**
+   * Declared properties of an object or link type, each null (or, for an
+   * object property, its default): an unset declared property reads back as
+   * null, as on Postgres, where it is a NULL column. Unset and null are the
+   * same value.
+   */
+  private _declaredNulls(kind: 'object' | 'link', type: string): Record<string, unknown> {
+    const schema = this._schemas.get(this._currentSchemaVersion);
+    const types: Array<{ name: string; properties?: Array<{ name: string }> }> =
+      kind === 'object' ? (schema?.objectTypes ?? []) : (schema?.linkTypes ?? []);
+    const def = types.find((t) => t.name === type);
+    const nulls: Record<string, unknown> = {};
+    for (const p of def?.properties ?? []) {
+      // Object columns carry the property's default on Postgres; link columns
+      // do not.
+      const dflt = (p as { defaultValue?: unknown }).defaultValue;
+      nulls[p.name] = kind === 'object' && dflt !== undefined ? clone(dflt) : null;
+    }
+    return nulls;
+  }
+
   /** @internal */ _doCreateObject(ctx: RequestContext, type: string, properties: Record<string, unknown>): OntologyObject {
     const id = genId();
     const timestamp = now();
     const obj: OntologyObject = {
+      ...this._declaredNulls('object', type),
+      ...properties,
       _tenantId: ctx.tenantId,
       _type: type,
       _id: id,
       _version: 1,
       _createdAt: timestamp,
       _updatedAt: timestamp,
-      ...properties,
     };
     const key = `${type}:${id}`;
     this._objects.set(key, obj);
@@ -485,7 +507,12 @@ export class MemoryStorageProvider implements StorageProvider {
     if (def) this._enforceEndpoints(ctx, def.fromType, fromId, def.toType, toId);
     // Strip _engineLinkId from user-facing properties
     const { _engineLinkId: _, ...userProps } = properties ?? {};
+    const declared = this._declaredNulls('link', type);
+    // ODL rule 11: a link type's `id: ID! @primary` property is the link's ID
+    // unless given, as on Postgres.
+    if ('id' in declared && !('id' in userProps)) userProps['id'] = id;
     const link: OntologyLink = {
+      ...declared,
       _tenantId: ctx.tenantId,
       _type: type,
       _id: id,
@@ -576,6 +603,17 @@ export class MemoryStorageProvider implements StorageProvider {
     const fromVersion = this._currentSchemaVersion;
     this._currentSchemaVersion = schema.version;
     this._schemas.set(schema.version, clone(schema));
+    // A newly declared property reads back on records that predate it as an
+    // added Postgres column does: its default on current objects (Postgres
+    // fills existing rows with it), null in their history and on links.
+    const fill = (rec: Record<string, unknown>, values: Record<string, unknown>, keepDefaults: boolean) => {
+      for (const k of Object.keys(values)) if (!(k in rec)) rec[k] = keepDefaults ? values[k] : null;
+    };
+    for (const obj of this._objects.values()) fill(obj, this._declaredNulls('object', obj._type), true);
+    for (const history of this._versionHistory.values()) {
+      for (const snap of history) fill(snap, this._declaredNulls('object', snap._type), false);
+    }
+    for (const link of this._links.values()) fill(link, this._declaredNulls('link', link._type), false);
     return {
       success: true,
       fromVersion,

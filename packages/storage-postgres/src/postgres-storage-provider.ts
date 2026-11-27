@@ -42,6 +42,7 @@ import type {
 import { createLogger } from '@openfoundry/observability';
 import { generateDDL } from './schema/index.js';
 import { pgIdent, snakeCase, pgIndexMethod } from './schema/type-mapping.js';
+import { planColumns, reconcileColumns } from './schema/ddl-reconcile.js';
 import {
   createObject as pgCreateObject,
   getObject as pgGetObject,
@@ -253,10 +254,16 @@ export class PostgresStorageProvider implements StorageProvider {
       for (const stmt of ddl.consent) {
         await this._pool.query(stmt);
       }
-      this._currentSchemaVersion = schema.version;
-      this._schemas.set(schema.version, schema);
-      const now = new Date().toISOString() as DateTime;
-      return { success: true, fromVersion, toVersion: schema.version, appliedAt: now };
+      // Columns of properties added after their table was created (including
+      // by versions applied before reconciliation existed). Nothing missing is
+      // the usual start-up: return without the lock. Otherwise go on to the
+      // locked path, which re-checks and adds them in one transaction.
+      if ((await planColumns(this._pool, schema, this._dataSchema)).length === 0) {
+        this._currentSchemaVersion = schema.version;
+        this._schemas.set(schema.version, schema);
+        const now = new Date().toISOString() as DateTime;
+        return { success: true, fromVersion, toVersion: schema.version, appliedAt: now };
+      }
     }
 
     // Use a dedicated client for the entire migration to ensure advisory lock
@@ -264,7 +271,9 @@ export class PostgresStorageProvider implements StorageProvider {
     const client = await this._pool.connect();
     let broken = false;
     try {
-      await client.query('BEGIN');
+      // READ COMMITTED whatever the database default: the re-check below must
+      // see what a pod that held the lock before us committed.
+      await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
       // Transaction-scoped advisory lock — released automatically on COMMIT/ROLLBACK
       await client.query('SELECT pg_advisory_xact_lock($1)', [0x4F46]);
 
@@ -286,6 +295,7 @@ export class PostgresStorageProvider implements StorageProvider {
         for (const stmt of ddl.consent) {
           await client.query(stmt);
         }
+        await reconcileColumns(client, schema, this._dataSchema);
         await client.query('COMMIT');
         this._currentSchemaVersion = schema.version;
         this._schemas.set(schema.version, schema);
@@ -298,6 +308,11 @@ export class PostgresStorageProvider implements StorageProvider {
       for (const stmt of ddl.consent) {
         await client.query(stmt);
       }
+
+      // CREATE TABLE IF NOT EXISTS leaves an existing type's table as it was:
+      // add the columns of properties this version declares for the first
+      // time, before the DDL below, whose indexes may name them.
+      await reconcileColumns(client, schema, this._dataSchema);
 
       // Execute ontology DDL statements (ddl.all includes consent which is
       // idempotent, so running it again is harmless)

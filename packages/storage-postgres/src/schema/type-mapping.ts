@@ -61,15 +61,24 @@ export function pgIndexMethod(indexType: string): string {
  * Sanitize an identifier for PostgreSQL (lowercase snake_case, quoted if needed).
  */
 export function pgIdent(name: string): string {
-  // Convert PascalCase/camelCase to snake_case
-  const snake = name
-    .replace(/([A-Z])/g, '_$1')
-    .toLowerCase()
-    .replace(/^_/, '');
+  const snake = pgIdentName(name);
   // Escape embedded double-quotes per SQL standard (double them),
   // then wrap in double-quotes to avoid reserved word conflicts.
   const escaped = snake.replace(/"/g, '""');
   return `"${escaped}"`;
+}
+
+/**
+ * The name pgIdent quotes, before PostgreSQL's 63-byte limit: PascalCase /
+ * camelCase to snake_case, one leading underscore dropped. DDL applies it on
+ * top of snakeCase (pgIdent(snakeCase(type.name))), so code that matches
+ * catalog names must do the same: `_Ward` is table "ward", not "_ward".
+ */
+export function pgIdentName(name: string): string {
+  return name
+    .replace(/([A-Z])/g, '_$1')
+    .toLowerCase()
+    .replace(/^_/, '');
 }
 
 /**

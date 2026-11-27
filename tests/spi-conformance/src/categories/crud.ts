@@ -2,7 +2,7 @@ import { describe, expect, beforeEach } from 'vitest';
 import { it } from '../known-failures.js';
 import type { StorageProvider } from '@openfoundry/spi';
 import type { ProviderFactory } from '../suite.js';
-import { tenantA, baseSchema } from '../fixtures.js';
+import { tenantA, tenantB, baseSchema } from '../fixtures.js';
 
 export function registerCrudTests(name: string, factory: ProviderFactory): void {
   describe(`[${name}] SPI Conformance: CRUD`, () => {
@@ -147,6 +147,44 @@ export function registerCrudTests(name: string, factory: ProviderFactory): void 
         (fetched as Record<string, unknown>).name = 'Modified';
         const refetched = await provider.getObject(tenantA, 'Patient', created._id);
         expect(refetched!.name).toBe('Eve');
+      });
+    });
+
+    // ─── Unset properties ───
+
+    describe('unset and null properties', () => {
+      it('a declared property not given on create reads back as null', async () => {
+        const created = await provider.createObject(tenantA, 'Patient', { name: 'NoAge' });
+        expect(created.age).toBeNull();
+        const fetched = await provider.getObject(tenantA, 'Patient', created._id);
+        expect(fetched!.age).toBeNull();
+        const page = await provider.queryObjects(tenantA, 'Patient', { field: 'name', operator: 'eq', value: 'NoAge' });
+        expect(page.items[0]!.age).toBeNull();
+      });
+
+      it('an update that omits a property leaves it unchanged', async () => {
+        const created = await provider.createObject(tenantA, 'Patient', { name: 'Keep', age: 30 });
+        const updated = await provider.updateObject(tenantA, 'Patient', created._id, { status: 'active' });
+        expect(updated.age).toBe(30);
+      });
+
+      it('an update that sets a property to null clears it', async () => {
+        const created = await provider.createObject(tenantA, 'Patient', { name: 'Clear', age: 30 });
+        await provider.updateObject(tenantA, 'Patient', created._id, { age: null });
+        const fetched = await provider.getObject(tenantA, 'Patient', created._id);
+        expect(fetched!.age).toBeNull();
+      });
+
+      it('a property cannot override a system field', async () => {
+        // Rejecting the property (Postgres: no such column) or ignoring it
+        // (memory) are both fine; writing the object into tenant B is not.
+        const created = await provider
+          .createObject(tenantA, 'Patient', { name: 'Sys', _tenantId: tenantB.tenantId } as Record<string, unknown>)
+          .catch(() => null);
+        if (created) {
+          expect(created._tenantId).toBe(tenantA.tenantId);
+          expect(await provider.getObject(tenantB, 'Patient', created._id)).toBeNull();
+        }
       });
     });
 

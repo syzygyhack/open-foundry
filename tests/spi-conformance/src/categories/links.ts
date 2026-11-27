@@ -59,8 +59,10 @@ export function registerLinkTests(name: string, factory: ProviderFactory): void 
       it('creates link without properties', async () => {
         const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
         expect(link._type).toBe('AssignedTo');
-        // No custom properties set
-        expect(link.role).toBeUndefined();
+        // A declared property not set reads back as null, on both providers.
+        expect(link.role).toBeNull();
+        const fetched = await provider.getLink(tenantA, 'AssignedTo', link._id);
+        expect(fetched!.role).toBeNull();
       });
     });
 

@@ -7,7 +7,7 @@
 
 import { describe, expect, beforeEach } from 'vitest';
 import { it } from '../known-failures.js';
-import type { StorageProvider, RequestContext, MigrationResult } from '@openfoundry/spi';
+import type { OntologySchema, StorageProvider, RequestContext, MigrationResult } from '@openfoundry/spi';
 import type { ProviderFactory } from '../suite.js';
 import { tenantA, baseSchema, schemaV2, schemaV3 } from '../fixtures.js';
 
@@ -67,6 +67,62 @@ export function registerSchemaTests(name: string, factory: ProviderFactory): voi
         expect(r3.success).toBe(true);
         expect(r3.fromVersion).toBe(2);
         expect(r3.toVersion).toBe(3);
+      });
+
+      it('a property added in a later version is writable, and reads back null on older records', async () => {
+        await provider.applySchema(ctx, baseSchema);
+        const before = await provider.createObject(ctx, 'Patient', { name: 'Before' });
+        const v2: OntologySchema = {
+          ...baseSchema,
+          version: 2,
+          objectTypes: baseSchema.objectTypes.map((t) =>
+            t.name === 'Patient' ? { ...t, properties: [...t.properties, { name: 'nickname', type: 'String' }] } : t,
+          ),
+        };
+        await provider.applySchema(ctx, v2);
+        const after = await provider.createObject(ctx, 'Patient', { name: 'After', nickname: 'Al' });
+        expect((await provider.getObject(ctx, 'Patient', after._id))!.nickname).toBe('Al');
+        expect((await provider.getObject(ctx, 'Patient', before._id))!.nickname).toBeNull();
+      });
+
+      it('a property added later with a default reads back the default, old records included', async () => {
+        await provider.applySchema(ctx, baseSchema);
+        const before = await provider.createObject(ctx, 'Patient', { name: 'Before' });
+        const v2: OntologySchema = {
+          ...baseSchema,
+          version: 2,
+          objectTypes: baseSchema.objectTypes.map((t) =>
+            t.name === 'Patient'
+              ? { ...t, properties: [...t.properties, { name: 'priority', type: 'Int', defaultValue: 3 }] }
+              : t,
+          ),
+        };
+        await provider.applySchema(ctx, v2);
+        const after = await provider.createObject(ctx, 'Patient', { name: 'After' });
+        expect((await provider.getObject(ctx, 'Patient', after._id))!.priority).toBe(3);
+        expect((await provider.getObject(ctx, 'Patient', before._id))!.priority).toBe(3);
+      });
+
+      it('a property added later with an index on it is applied, and can be filtered on', async () => {
+        await provider.applySchema(ctx, baseSchema);
+        await provider.createObject(ctx, 'Patient', { name: 'Before' });
+        const v2: OntologySchema = {
+          ...baseSchema,
+          version: 2,
+          objectTypes: baseSchema.objectTypes.map((t) =>
+            t.name === 'Patient'
+              ? {
+                  ...t,
+                  properties: [...t.properties, { name: 'ward', type: 'String' }],
+                  indexes: [...(t.indexes ?? []), { field: 'ward', indexType: 'BTREE' as const }],
+                }
+              : t,
+          ),
+        };
+        await expect(provider.applySchema(ctx, v2)).resolves.toMatchObject({ success: true, toVersion: 2 });
+        await provider.createObject(ctx, 'Patient', { name: 'After', ward: 'W1' });
+        const page = await provider.queryObjects(ctx, 'Patient', { field: 'ward', operator: 'eq', value: 'W1' });
+        expect(page.items.map((p) => p.name)).toEqual(['After']);
       });
 
       it('apply schema is idempotent (re-applying same version succeeds)', async () => {

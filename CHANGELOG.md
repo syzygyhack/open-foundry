@@ -97,6 +97,27 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Postgres: a property added to an existing type in a later schema version
+  gets its column.** Object and link tables were created with `CREATE TABLE IF
+  NOT EXISTS` and never altered, so writing a property that a later version
+  added to an existing type failed with "column does not exist". Every
+  `applySchema` now adds the columns of declared properties that are missing,
+  including for versions applied before this release: on the object and its
+  history table together (matched by the names the DDL gives them, cut to
+  PostgreSQL's 63 bytes), in
+  one READ COMMITTED transaction under the migration lock, and before the
+  version's own DDL, whose indexes may name the new columns. A start-up with
+  nothing to add takes no lock. Existing rows read the new
+  property as its default, or null.
+
+- **The memory provider returns unset properties as Postgres does.** A declared
+  property that was never set now reads back as `null` (or, on objects, its
+  default) instead of being absent, on create and after a schema version adds
+  the property; Postgres, the production store, already did this. Memory links
+  also get the `id` property Postgres fills in. A property named like a system
+  field (`_tenantId`, `_id`, ...) can no longer overwrite it on create: the
+  memory provider let a create in one tenant write the object into another.
+
 - **Hard delete removes the object's links, as the spec requires.** Both
   storage providers removed the object (and its history) but left every link
   from or to it, with its properties: traversal from the deleted ID still
