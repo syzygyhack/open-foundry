@@ -7,8 +7,10 @@ image:
   registry: ghcr.io/syzygyhack/open-foundry
   pullPolicy: IfNotPresent
   # Pinned to an exact release, never a floating minor. For immutable
-  # deployments override with a digest, e.g.
-  #   --set apiGateway.image.repository=ghcr.io/.../api-gateway@sha256:<digest>
+  # deployments pin a service to its digest (from the release's
+  # image-digests.txt), e.g.
+  #   --set apiGateway.image.digest=sha256:<64 hex digits>
+  # A service's image.repository is a bare path, without a tag or digest.
   tag: "0.3.0"
 
 imagePullSecrets: []
@@ -104,8 +106,11 @@ sync:
 
 # -- CEL evaluator (Go sidecar)
 # HELM-20: Include grpc:// protocol prefix
+# Empty: the chart's own CEL evaluator Service,
+# grpc://<fullname>-cel-evaluator:<celEvaluatorService.port>. Set a URL only for
+# an evaluator outside the release.
 celEvaluator:
-  url: grpc://cel-evaluator:50051
+  url: ""
 
 # -- CORS (comma-separated origins for production; empty = deny all cross-origin)
 cors:
@@ -307,7 +312,7 @@ monitoring:
   prometheusRules:
     enabled: false
 
-# -- Database initialization Job (runs as Helm post-install/post-upgrade hook)
+# -- Database initialization Job (runs as a Helm pre-install/pre-upgrade hook)
 initJob:
   enabled: true
   image: postgres:17

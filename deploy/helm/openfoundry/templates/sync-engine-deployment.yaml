@@ -28,7 +28,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: sync-engine
-          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.syncEngine.image "name" "sync") }}
+          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.syncEngine.image "name" "sync-engine" "key" "syncEngine") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{/* HELM-07: Container security context */}}
           securityContext:

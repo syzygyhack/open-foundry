@@ -28,7 +28,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: ontology-engine
-          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.ontologyEngine.image "name" "engine") }}
+          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.ontologyEngine.image "name" "ontology-engine" "key" "ontologyEngine") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{/* HELM-07: Container security context */}}
           securityContext:

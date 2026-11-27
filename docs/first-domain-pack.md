@@ -88,7 +88,10 @@ type Book @objectType {
 
 `@objectType` makes it a first-class entity: it gets storage, REST and GraphQL
 surfaces, version history, and an entry in the authorization model. `@unique`
-and `@indexed` shape the database; `@searchable` feeds full-text search.
+and `@indexed` shape the database; `@searchable` requests a search index; it does not decide which fields a
+search looks in. A search names its fields or, by default, looks in the
+type's text fields (for a caller with field restrictions, the visible, stored, non-primary,
+single-valued `String` properties whose names do not start with `_`).
 
 `schema/member.odl` introduces one more idea:
 

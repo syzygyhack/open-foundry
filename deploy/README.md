@@ -151,8 +151,10 @@ unset, so check the boot log first if seeded data appears to be missing.
 
 > Looking for the seeded rows directly? Object data lives in the relational
 > table `public.<snake_case_type>` (a column per property). The Apache AGE label
-> table holds **id-only vertices** (`{id, tenant_id}`) used for graph traversal —
-> so inspecting the AGE properties map will always look empty, for seeded and
+> table holds a best-effort graph mirror (the platform's own traversal reads
+> the relational link tables): each vertex carries only `id` and `tenant_id`,
+> plus `updated = true` once the object has been updated, so the AGE
+> properties map never holds the object's data, for seeded and
 > runtime-created objects alike.
 
 ### Automated production-mode enforcement test
@@ -184,20 +186,65 @@ dedicated `enforcement-e2e` CI job rather than the standard integration suite.
 Releases publish container images and a versioned Helm chart, so a deployment
 does not have to build from source:
 
+The chart needs an external PostgreSQL 17 server with Apache AGE (see
+"Database prerequisites"), an OIDC issuer, an OpenFGA store and a
+Kafka-compatible broker. Create the database Secret and the Secret holding
+the source-system (PAS) database URL, which the chart requires, then install:
+
 ```bash
 # Images: ghcr.io/syzygyhack/open-foundry/<service>:<version>
+# PG_PASSWORD must be URI-safe (letters, digits, - . _ ~): the gateway reads
+# it from a postgresql:// URL. For example: openssl rand -hex 24
+kubectl create secret generic openfoundry-postgres \
+  --from-literal=username=openfoundry --from-literal=password="$PG_PASSWORD"
+kubectl create secret generic openfoundry-pas --from-literal=dbUrl="$PAS_DB_URL"
+
 helm install openfoundry \
-  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.3.0
+  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.3.0 \
+  --set storage.postgres.host="$PG_HOST" \
+  --set auth.oidc.issuer="$OIDC_ISSUER" \
+  --set auth.oidc.clientId="$OIDC_CLIENT_ID" \
+  --set auth.oidc.existingSecret= \
+  --set authz.openfga.url="$OPENFGA_URL" \
+  --set authz.openfga.storeId="$OPENFGA_STORE_ID" \
+  --set eventBus.redpanda.bootstrapServers="$KAFKA_BOOTSTRAP"
 ```
+
+- **JWKS.** The JWKS URL defaults to Keycloak's key path under the issuer
+  (`<issuer>/protocol/openid-connect/certs`); for any other provider also set
+  `auth.oidc.jwksUri`.
+- **Event bus.** `--set` splits values on commas, so give one `host:port`
+  there and a broker list (`a:9092,b:9092`) in a values file. Without a
+  broker the gateway still starts, but events stay in each gateway process,
+  so subscribers miss events published through another replica. Run a single
+  gateway then: `--set apiGateway.replicaCount=1 --set
+  apiGateway.autoscaling.enabled=false` instead of the broker flag.
+- **`auth.oidc.existingSecret`.** The chart only checks, on upgrade, that a
+  Secret of this name (default `openfoundry-oidc`) exists; nothing mounts it.
+  Clearing it skips the check.
+- **PAS database.** Required by the chart and passed to the sync engine as
+  `PAS_DB_URL`; in this release the sync engine container serves only its
+  health endpoint. To give the URL inline, set `sync.pas.dbUrl` and clear
+  `sync.pas.existingSecret` (`--set sync.pas.existingSecret=`), which
+  otherwise takes precedence.
+- **CEL evaluator.** The gateway reaches the release's own CEL evaluator
+  Service by default; set `celEvaluator.url` only for one outside the release.
+  Where NetworkPolicy is enforced, an external evaluator on TCP 50051 (or any
+  port the chart's egress rules do not list) also needs an egress rule.
+- An OpenTelemetry collector (`observability.otlp.endpoint`, OTLP/HTTP on
+  4318) is optional.
 
 The chart's `version` and `appVersion` always match the platform release it
 deploys, and image tags are pinned to that exact version rather than a floating
-minor. For immutable deployments, override a service with its digest — every
-release attaches `image-digests.txt` listing the digest for each image:
-
-```bash
---set apiGateway.image.repository=ghcr.io/syzygyhack/open-foundry/api-gateway@sha256:<digest>
-```
+minor. For immutable deployments, pin a service to its digest: every release
+attaches `image-digests.txt` listing the digest for each image. Add the digest
+to the install command, for example
+`--set apiGateway.image.digest=sha256:<64 hex digits>`, using the part after `@` from the image's line in `image-digests.txt`. A
+service's `image.digest` takes precedence over its tag and must be
+`sha256:` followed by 64 lowercase hex digits; set it per service
+(`apiGateway`, `ontologyEngine`, `actionExecutor`, `securityService`,
+`syncEngine`, `celEvaluatorService`). `image.repository` is a bare
+repository path (registry host and port included), without a tag or digest.
 
 Release assets also include the OpenAPI, GraphQL and AsyncAPI contracts, a
 CycloneDX SBOM, and a build provenance attestation verifiable with

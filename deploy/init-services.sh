@@ -121,9 +121,25 @@ load_openfga_model() {
   local env_file="${SCRIPT_DIR}/.env"
   if [ -f "${env_file}" ]; then
     if grep -q '^OPENFGA_STORE_ID=' "${env_file}"; then
-      sed -i "s/^OPENFGA_STORE_ID=.*/OPENFGA_STORE_ID=${store_id}/" "${env_file}"
-    else
-      echo "OPENFGA_STORE_ID=${store_id}" >> "${env_file}"
+      # Portable edit (BSD sed's -i takes a suffix argument). The new file is
+      # staged beside .env (mktemp creates it 0600; .env holds passwords),
+      # filled, given .env's own mode (GNU or BSD stat; it stays 0600 if
+      # neither answers), and renamed over .env only once complete (mv -f: a
+      # read-only .env would otherwise prompt on a terminal), so a failure
+      # leaves .env as it was.
+      local tmp="" mode=""
+      mode=$(stat -c %a "${env_file}" 2>/dev/null || stat -f %Lp "${env_file}" 2>/dev/null || true)
+      if ! tmp=$(mktemp "${env_file}.XXXXXX") \
+        || ! sed "s/^OPENFGA_STORE_ID=.*/OPENFGA_STORE_ID=${store_id}/" "${env_file}" > "${tmp}" \
+        || { [ -n "${mode}" ] && ! chmod "${mode}" "${tmp}"; } \
+        || ! mv -f "${tmp}" "${env_file}"; then
+        if [ -n "${tmp}" ]; then rm -f "${tmp}"; fi
+        err "Could not update ${env_file} (left unchanged); set OPENFGA_STORE_ID=${store_id} manually."
+        return 1
+      fi
+    elif ! echo "OPENFGA_STORE_ID=${store_id}" >> "${env_file}"; then
+      err "Could not update ${env_file}; set OPENFGA_STORE_ID=${store_id} manually."
+      return 1
     fi
     log "Wrote OPENFGA_STORE_ID=${store_id} to ${env_file}"
   else

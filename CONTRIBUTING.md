@@ -5,8 +5,8 @@ conventions that are easy to miss, and how to get a change reviewed quickly.
 
 ## Getting set up
 
-**Prerequisites:** Node.js >= 24, pnpm 9.15+, Docker with Compose v2, and Go 1.25+
-(only if you build `packages/cel-evaluator` outside Docker).
+**Prerequisites:** Node.js >= 24, pnpm 9.15+, Docker with Compose v2, and Go 1.26+
+(only if you build `packages/cel-evaluator` outside Docker; the image pins Go 1.27.4).
 
 ```bash
 pnpm install

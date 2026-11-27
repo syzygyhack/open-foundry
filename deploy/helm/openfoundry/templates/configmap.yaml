@@ -28,7 +28,7 @@ data:
   OPENFGA_URL: {{ .Values.authz.openfga.url | quote }}
   {{/* HELM-06: OPENFGA_STORE_ID is infrastructure config, not a secret */}}
   OPENFGA_STORE_ID: {{ .Values.authz.openfga.storeId | quote }}
-  CEL_EVALUATOR_URL: {{ .Values.celEvaluator.url | quote }}
+  CEL_EVALUATOR_URL: {{ .Values.celEvaluator.url | default (printf "grpc://%s-cel-evaluator:%v" (include "openfoundry.fullname" .) .Values.celEvaluatorService.port) | quote }}
   DEBEZIUM_URL: {{ .Values.sync.debezium.url | quote }}
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.observability.otlp.endpoint | quote }}
   DOMAIN_PACKS: {{ .Values.domainPacks | toJson | quote }}

@@ -39,7 +39,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: api-gateway
-          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.apiGateway.image "name" "api") }}
+          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.apiGateway.image "name" "api-gateway" "key" "apiGateway") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{/* HELM-07: Container security context */}}
           securityContext:

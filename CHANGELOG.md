@@ -10,6 +10,97 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+### Breaking changes
+
+Each item is described in full under Added or Fixed; this lists what an
+upgrade can notice.
+
+API callers
+- **Field restrictions are checked on query inputs.** A caller with field
+  restrictions is refused (REST 403, GraphQL `FORBIDDEN`) for a hidden field
+  in a list filter (and GraphQL `orderBy`), an aggregate's fields, `groupBy`,
+  filter or `orderBy`, named search fields or a GraphQL search filter, a saved
+  Object Set's stored filter and sort when executed, or a saved set's filter
+  and its aggregation's inputs when aggregated (spec §7.1.3).
+  Leading-underscore names other than the platform's system fields are no
+  longer exempt.
+- **Filters and sorts on a type's primary field use it.** REST `filter[id]=`,
+  GraphQL `filter: {id: ...}` (lists and search), aggregate filters, saved
+  sets, and GraphQL list and saved-set sorts on the primary field now reach
+  storage as `_id`, so results and ordering can change (before, they named a
+  property no row stores; see Fixed).
+- **Search by such a caller looks in fewer fields.** With no fields named, it
+  searches the caller's visible, stored, single-valued `String` properties, so
+  the same request can return different hits and scores. An empty field list
+  (GraphQL `fields: []`, REST `fields=,`) searches nothing; REST `fields=`
+  still means no fields named.
+- **Undeclared types and filter fields are errors.** Once a schema is
+  applied, an object or link data operation on an undeclared type (not
+  `bulkMutate`, which is not guarded) is `TYPE_NOT_FOUND` and a filter on an undeclared field `INVALID_FILTER`, on
+  both providers (REST maps them to 404 and 400), where the memory provider
+  returned null or an empty page and Postgres a retryable 500.
+
+Storage (SPI) callers and provider authors
+- **Links follow the soft-delete rules.** `getLinks` and traversal leave out
+  soft-deleted objects and their links unless `includeDeleted` is set; a hard
+  delete removes the object's links; on Postgres, a traversal step filter now
+  narrows that step's targets.
+- **The memory provider pages like Postgres**: `getLinks` 100 links by
+  default and at most 1,000; `traverse` 100 final-step nodes by default. A
+  caller that read everything in one call reads the first page.
+- **The memory provider matches Postgres on records**: an unset declared
+  property reads `null` (or its default) instead of being absent; a deleted
+  link is kept as a record; a link ID already in use is rejected; a link of a
+  declared type to a missing, soft-deleted or other tenant's object is
+  rejected.
+- **Link pages break creation-time ties by ID**, on both providers and for
+  offset paging too, so links created in the same instant can come back in a
+  different order.
+- **Paging arguments are validated.** A `getLinks` limit or offset that is
+  not a non-negative safe integer, a malformed cursor, or a cursor with a
+  non-zero offset is `VALIDATION_ERROR`.
+- **Third-party providers must page links by cursor.** An action's
+  `deleteLink` effect and the FHIR and CDM Encounter history read links with
+  `getLinks` cursors (`LinkPage.cursor`, `QueryOptions.after`). On a
+  non-empty page that reports a next page, those readers now fail when the
+  provider returns no cursor or no link not already seen, rather than read
+  one page. The SPI conformance suite covers cursor continuation, deletion
+  between pages and invalid arguments.
+- **Aggregates are validated on both providers.** An aggregate `orderBy` must
+  name a `groupBy` field or an output, and outputs may not share a name or be
+  named `__proto__` (`VALIDATION_ERROR`); nulls sort last in either direction.
+- **Postgres: stricter writes and changed results.** A hard delete inside a
+  caller's transaction requires READ COMMITTED (`VALIDATION_ERROR`
+  otherwise); `commit()` throws when the server answers `COMMIT` with
+  `ROLLBACK`; a new schema version whose type names cut to the same table
+  name is rejected. Null-matching filters (`eq null`, `neq`, `not`, an `in`
+  list containing null) now match unset columns; a search with an empty field
+  list returns no hits (it searched every text column); a point-in-time read at a version's own
+  timestamp returns that version (it returned the one before).
+
+Operators
+- **Helm: `helm upgrade` needs `list` on persistentvolumeclaims** in the
+  release namespace, to keep the claims the release created, or
+  `postgresql.retainExistingClaims=false` once they are annotated or gone.
+  While a retained claim exists, rolling back or downgrading to an earlier
+  chart with `postgresql.enabled=true` fails (without touching the claim).
+- **Helm: the database init job gates install and upgrade.** It now runs
+  before the services and fails the release on a SQL error, where it ran
+  after them and reported success regardless.
+- **Telemetry goes to the collector's OTLP/HTTP port, 4318.** A custom
+  collector or network policy that allowed only 4317 needs a 4318 receiver or
+  egress rule.
+- **Helm: the CEL evaluator URL defaults to the release's own Service.**
+  `celEvaluator.url` defaulted to `grpc://cel-evaluator:50051`, a Service the
+  chart never creates (it creates `<fullname>-cel-evaluator`); it is now
+  empty, meaning the release's Service. An install that pointed a Service of
+  that name elsewhere sets `celEvaluator.url` explicitly.
+- **Helm: an emptied `image.repository` falls back to the published image
+  name** (`api-gateway`, `ontology-engine`, ...) rather than a short name
+  (`api`, `engine`, ...). A private registry that mirrored the short names
+  sets `image.repository` per service.
+- **Native CEL evaluator builds need Go 1.26+** (the image pins 1.27.4).
+
 ### Security
 
 - **Cleared CVE-2026-78661 (HIGH) from the CEL evaluator image.**
@@ -70,7 +161,7 @@ are called out under **Breaking changes**.
 - Routine updates: `@apollo/server` 5.5.2, `@grpc/grpc-js` 1.14.7 (override floor
   moved with it), `@openfga/sdk` 0.9.8, `graphql-subscriptions` 3.1.0,
   `graphql-ws` 6.4.3, `ws` 8.23.0 (override floor moved with it), `commander`
-  15.1.0, `jose` 6.2.18, `turbo` 2.11.11, `vitest` 5.1.0, `pnpm/action-setup`
+  15.1.0, `jose` 6.2.18, `turbo` 2.11.11 (locked 2.11.13), `vitest` 5.1.0 (locked 5.1.2), `pnpm/action-setup`
   6.1.1 and `azure/setup-helm` 5.1.0.
 
 - `ioredis` 6.1.0. Its headline feature, maintenance-notification handoffs, is on
@@ -109,21 +200,69 @@ are called out under **Breaking changes**.
   `knownFailures`, including third-party providers, get no exemptions. The six
   divergences first declared are fixed (see Fixed).
 
+- **The specification describes what ships.** `docs/open-foundry-spec-v2.md`
+  gains the link cursor contract, the unset-property and typed-error rules,
+  PostgreSQL hard-delete isolation, and field restrictions on query inputs
+  (§7.1.3). Where the spec states a target the code does not meet yet, a
+  "Current implementation" note says what the code does: filter node shape
+  validation, cardinality after soft delete, the `deleteLink` effect's reads
+  and error code, and search (per-type only, substring matching, offset
+  paging, `@searchable` as an index hint). TypeDB and Neo4j are marked
+  planned; the Kubernetes quick start uses the shipped chart's values; the
+  error transport mapping separates REST from FHIR; field restrictions are
+  described per route. `CONTRIBUTING.md` asks
+  for Go 1.26+ for native CEL builds.
+
 ### Fixed
 
+- **Helm: pinning a service to an image digest works.** The documented
+  override, `image.repository=…@sha256:<digest>`, rendered
+  `…@sha256:<digest>:<tag>`, which no registry accepts. A service now takes
+  `image.digest` (for example `--set apiGateway.image.digest=sha256:<digest>`,
+  digests listed in each release's `image-digests.txt`), which takes
+  precedence over the tag. An unset, null or empty digest uses the tag; any
+  other value (the string `<nil>` included) but `sha256:` and 64 lowercase hex digits fails the render, naming the
+  service's values key. A service whose
+  `image.repository` is emptied now falls back to its published image name
+  (`api-gateway`, `ontology-engine`, ...) instead of a short name (`api`,
+  `engine`) that was never published. The install example in
+  `deploy/README.md` now creates the database and source-system Secrets and
+  sets the values the chart requires (it failed validation as written).
+
+- **Helm: the gateway reaches the release's CEL evaluator.** The default
+  `celEvaluator.url`, `grpc://cel-evaluator:50051`, named a Service the chart
+  does not create (`<fullname>-cel-evaluator`), so a Helm install started but
+  every action needing CEL evaluation failed. An empty `celEvaluator.url`
+  (the new default) now resolves to the release's own Service and port.
+
+- **`deploy/init-services.sh` runs on a fresh checkout and on macOS.** It was
+  committed without its executable bit, so `./init-services.sh` failed with
+  "Permission denied", and it wrote the OpenFGA store ID with GNU `sed -i`,
+  which BSD `sed` rejects; it is now executable and rewrites `.env`
+  portably, in place (keeping its permissions; the file holds passwords), and
+  reports a failed write instead of claiming success.
+
 - **Unknown types and filter fields are errors, the same on both providers.**
-  An undeclared object or link type is now `TYPE_NOT_FOUND` (REST 404) and a
+  An undeclared object or link type is now `TYPE_NOT_FOUND` (REST 404) in
+  object and link data operations (`bulkMutate` is not guarded yet) and a
   filter naming an undeclared field `INVALID_FILTER` (REST 400, not retryable).
   Before, the memory provider returned null or an empty page, and Postgres
   threw a raw database error that the REST API reported as a retryable 500
   with the Postgres error code. A missing object of a declared type still
   reads as null. Where the API checks first, its answer comes first: a caller
   with field restrictions gets 403 for a field outside its visible set, and a
-  caller who may see no objects of the type gets an empty 200. A filter or
+  caller who may see no objects of the type gets an empty 200 on a REST list,
+  aggregate or search (search after validating `q`: a missing query is still
+  400 `MISSING_QUERY`; saved-set execution and GraphQL lists check the fields
+  before that shortcut; spec §7.1.3 gives the order per route). A filter or
   sort on a type's primary field (REST `filter[id]=...`, GraphQL
-  `filter: {id: {eq: ...}}`, aggregate filters, saved object sets; list
-  sorts) now reaches storage as `_id`; it used to match nothing, and with the
-  new check would have been rejected. Field restrictions are still checked on
+  `filter: {id: {eq: ...}}` on lists and search, aggregate filters, saved
+  object sets; list sorts) now reaches storage as `_id`, so results and
+  ordering can change. It named a property no row stores. A filter on it, on
+  the memory provider, matched nothing with `eq` and could match everything
+  with `neq`, and Postgres could fail on the missing column; with the new
+  filter check it would have been rejected. A sort on it left the memory
+  provider's order unsorted (every value tied) and could fail on Postgres. Field restrictions are still checked on
   the name the client sent, and now also on a saved object set's filter and
   sort when it is executed: that route checked none, so a caller could filter
   or sort through a saved set on a field hidden from them. The check also
@@ -135,8 +274,10 @@ are called out under **Breaking changes**.
   through, `_id` included. GraphQL refuses such a list, search or filter as
   `FORBIDDEN` (not retryable), as REST answers 403; it was a plain error,
   reported as a retryable `INTERNAL_ERROR`. A search that names no fields, by a
-  caller with field restrictions, looks in the type's visible text properties
-  only (it could name the primary field, which is not a column). An
+  caller with field restrictions, looks in the type's visible, single-valued `String` properties
+  only, not the primary, `@computed` or `@link` fields or names starting with
+  `_` (it could name the primary field, which is not a column); an empty field
+  list (GraphQL `fields: []`, REST `fields=,`) searches nothing. An
   aggregate's `orderBy` is not renamed: it names
   output aliases and grouping keys, and a caller with field restrictions may
   now sort by an aggregate's own output (it was refused as a hidden field).
@@ -156,10 +297,13 @@ are called out under **Breaking changes**.
   returned edges to targets it then dropped. Both providers traversed from a
   soft-deleted start object, and `getLinks` returned links to or from a
   soft-deleted object, which the spec (§3.3 rule 3) leaves out by default. Now
-  a step filter narrows that step's targets, an edge is returned only with its
-  target, and soft-deleted objects and their links are left out unless
-  `includeDeleted` is set. The memory provider's `getLinks` and `traverse` now
-  page like Postgres (oldest first, 100 by default, at most 1000 links). An
+  a step filter narrows that step's targets, an edge is returned only if its
+  target passed the step filter and visibility checks, and soft-deleted objects
+  and their links are left out unless `includeDeleted` is set. The memory
+  provider's `getLinks` now pages like Postgres (oldest first by creation time
+  and ID, 100 by default, at most 1000 links), and `traverse` on both pages
+  the final step's nodes (100 by default) while returning every edge it
+  recorded, including edges to nodes outside the returned page. An
   action's `deleteLink` effect now reads every page of links: it read only the
   first, so on Postgres (and now on memory) a match past the first 100 links
   was missed, and `expect: ALL` left the rest. It now pages with `getLinks`
@@ -190,8 +334,9 @@ are called out under **Breaking changes**.
   PostgreSQL's 63 bytes), in
   one READ COMMITTED transaction under the migration lock, and before the
   version's own DDL, whose indexes may name the new columns. A start-up with
-  nothing to add takes no lock. Existing rows read the new
-  property as its default, or null.
+  nothing to add takes no lock. Existing current rows read the
+  new property as its default, or null; existing links and historical
+  snapshots read null.
 
 - **Postgres: catalog lookups use the names the tables were created with.**
   The DDL drops a leading underscore from a type's table name (`_Ward` is
@@ -233,7 +378,8 @@ are called out under **Breaking changes**.
   `createLink` holds a share lock on both endpoints until it commits. That
   needs the delete to read at READ COMMITTED (the default), so a hard delete
   inside a caller's transaction at a stricter isolation level is refused with
-  `VALIDATION_ERROR`; outside a transaction it always works. Creating,
+  `VALIDATION_ERROR`; a standalone hard delete opens its own READ COMMITTED
+  transaction. Creating,
   updating and soft-deleting an object on Postgres now write the row and its
   history snapshot in one transaction too, so a hard delete can no longer
   slip between them and leave a history row of the deleted object behind. A
@@ -261,7 +407,12 @@ are called out under **Breaking changes**.
   `postgresql.enabled` is deprecated: it only ever created a volume claim, no
   server. Claims the release created are now kept: the chart keeps rendering
   each, under its own name, with `resource-policy: keep` while it exists, even
-  after the value is turned off or the release renamed, so an upgrade from an
+  after the value is turned off or `fullnameOverride`/`nameOverride` changes
+  the generated name (a claim is the release's when its Helm release-name and
+  release-namespace annotations match and it is labelled
+  `app.kubernetes.io/component: postgresql` or named `*-postgresql`, so a
+  differently named release does not inherit it; the namespace-wide lookup
+  runs unless `postgresql.retainExistingClaims=false`), so an upgrade from an
   earlier chart (whose claim had no such annotation) cannot delete it or its
   volume. Turning the value off and on again keeps the claim's bound fields.
   An upgrade finds claims by listing the namespace's, so the account running
@@ -325,8 +476,10 @@ are called out under **Breaking changes**.
 
   The FHIR and CDM Encounter projections now read every page of a patient's
   admissions. History comes oldest first, so a full first page could leave out
-  the current admission. Paging follows `hasNextPage` and de-duplicates by ID,
-  so pages that shift between reads cannot cut it short. Postgres pages links
+  the current admission. Paging follows `getLinks` cursors and de-duplicates
+  link IDs. It stops at an empty page; a non-empty page that reports a next
+  page but has no cursor or no unseen link, or a scan past the page bound,
+  raises an error instead of returning a partial history. Postgres pages links
   by creation time and then ID, so links created in the same instant cannot
   shift between pages. The SPI conformance suite gains the cases that would
   have caught this.

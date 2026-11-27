@@ -67,13 +67,25 @@ Falls back to release-scoped name (not cluster default) when no override is set.
 {{- end }}
 
 {{/*
-Image reference for a service.
+Image reference for a service: repository@digest when the service sets a
+digest, otherwise repository:tag (the service's tag, else the release's).
+An unset, null or empty digest means no digest; any other value must be
+sha256: and 64 lowercase hex digits.
+The repository defaults to <image.registry>/<name>, name being the published
+image name; key is the service's values key, for error messages.
 */}}
 {{- define "openfoundry.image" -}}
-{{- $tag := default .global.tag .svc.tag -}}
-{{- if .svc.repository -}}
-{{ .svc.repository }}:{{ $tag }}
+{{- $repo := default (printf "%s/%s" .global.registry .name) .svc.repository -}}
+{{- $digest := "" -}}
+{{- if and (hasKey .svc "digest") (not (kindIs "invalid" .svc.digest)) -}}
+{{- $digest = toString .svc.digest -}}
+{{- end -}}
+{{- if $digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) -}}
+{{- fail (printf "%s.image.digest must be sha256: followed by 64 lowercase hex digits (got %q)" .key $digest) -}}
+{{- end -}}
+{{ $repo }}@{{ $digest }}
 {{- else -}}
-{{ .global.registry }}/{{ .name }}:{{ $tag }}
+{{ $repo }}:{{ default .global.tag .svc.tag }}
 {{- end -}}
 {{- end }}

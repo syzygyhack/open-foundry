@@ -28,7 +28,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: security-service
-          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.securityService.image "name" "security") }}
+          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.securityService.image "name" "security-service" "key" "securityService") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{/* HELM-07: Container security context */}}
           securityContext:

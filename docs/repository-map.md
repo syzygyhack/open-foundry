@@ -65,7 +65,7 @@ All persistence goes through a pluggable SPI. The platform ships two implementat
 | Capability | Status |
 |-----------|--------|
 | Full-text search | Supported |
-| Graph traversal (AGE) | Supported (max depth 10, max nodes 10,000) |
+| Graph traversal | Supported over the relational link tables (max depth 10, max nodes 10,000); AGE holds a graph mirror |
 | Transactions | Supported (configurable isolation level) |
 | Temporal queries | Supported |
 | Bulk mutations | Supported (with idempotency cache) |

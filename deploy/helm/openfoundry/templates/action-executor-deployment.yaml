@@ -28,7 +28,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: action-executor
-          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.actionExecutor.image "name" "actions") }}
+          image: {{ include "openfoundry.image" (dict "global" .Values.image "svc" .Values.actionExecutor.image "name" "action-executor" "key" "actionExecutor") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{/* HELM-07: Container security context */}}
           securityContext:

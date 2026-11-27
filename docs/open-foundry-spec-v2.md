@@ -612,6 +612,7 @@ interface TraversalStep {
 interface QueryOptions {
   limit?: number;
   offset?: number;
+  after?: string;             // getLinks only: continue after a LinkPage.cursor (keyset paging)
   orderBy?: { field: string; direction: 'asc' | 'desc' }[];
   includeDeleted?: boolean;
   asOfVersion?: number;
@@ -681,6 +682,16 @@ Filter validity rules:
 3. `and`/`or` arrays MUST be non-empty.
 4. Mixed nodes (e.g., both `field` and `and`) are invalid and MUST be rejected at validation time.
 
+> **Current implementation:** the providers do not yet enforce these rules. An omitted `value` on `eq` is treated as `eq null`; a node with `field` and `operator` that also has a logical branch is evaluated as the field predicate; a node with more than one of `and`, `or`, `not` is evaluated by one of them, in that order: PostgreSQL skips an empty `and`/`or` array and takes the next branch, while the memory provider takes the first branch present, so an empty `and` matches everything and an empty `or` nothing there. Once a schema is applied, a filter naming an undeclared field is rejected with `INVALID_FILTER` wherever the provider evaluates it.
+
+Property and error rules (both reference providers):
+
+1. A declared property that was never set reads back as `null` (or its schema default on current objects). A property added to a type in a later schema version reads its declared default (or `null`) on existing current objects, and `null` on existing links and historical versions.
+2. `eq null` and an `in` list containing `null` match unset properties; `neq 'x'` and `not(eq 'x')` match them too.
+3. Once a schema is applied, an object or link data operation (create, read, update, delete, query, links, traversal, search, aggregate; not `bulkMutate`) on an undeclared object or link type fails with `TYPE_NOT_FOUND`, and a filter on an undeclared field with `INVALID_FILTER`; the REST API maps them to 404 and 400 when such an error reaches its error wrapper. Index and schema-introspection calls and `bulkMutate` are not guarded: in a bulk mutation an undeclared type can be accepted (memory) or fail as `INTERNAL_ERROR` (PostgreSQL). A missing object of a declared type still reads as `null` (or an empty page).
+
+Link paging: `getLinks` returns links oldest first (creation time, then ID), 100 per page by default and at most 1,000. A non-empty `LinkPage` carries a `cursor`; passing it back as `after` continues after the last link returned, and unlike an offset it does not shift when earlier links are deleted or inserted. A cursor is opaque and only valid with the provider that issued it. A cursor combined with a non-zero `offset`, a malformed cursor, or a `limit`/`offset` that is not a non-negative safe integer fails with `VALIDATION_ERROR`. The platform's own multi-page readers (the `deleteLink` effect, Encounter history) stop at an empty page; on a non-empty page that reports a next page they fail rather than truncate when the provider returns no cursor or no link not already seen, or when the walk exceeds its page bound (cursor values are not compared); the SPI conformance suite covers cursor continuation, deletion between pages and invalid arguments.
+
 ### 3.3 Soft-Delete Semantics
 
 Soft-deleted objects (those with a non-null `_deletedAt`) follow these rules:
@@ -690,7 +701,11 @@ Soft-deleted objects (those with a non-null `_deletedAt`) follow these rules:
 3. **Links to/from soft-deleted objects** remain in the store but are excluded from traversal and `getLinks` results by default. Setting `includeDeleted: true` includes them. Active links to/from a soft-deleted object are NOT automatically soft-deleted — they remain active but unreachable through default queries. This preserves link history for audit and lineage purposes while preventing traversal to deleted nodes.
 4. **Link cardinality** is evaluated against active (non-deleted) links only. A soft-deleted link does not count against cardinality limits. An active link pointing to a soft-deleted object does not count against cardinality limits either, since the target is not a valid endpoint.
 5. **New links to soft-deleted objects** are rejected. The `createLink` operation MUST verify that both `fromId` and `toId` reference non-deleted objects (i.e., `_deletedAt` is null). Attempting to link to or from a soft-deleted object returns a `REFERENTIAL_INTEGRITY` error.
+
 6. **Hard-delete** physically removes the object and all its inbound and outbound links from the store. This is irreversible and SHOULD be restricted to data retention compliance workflows.
+
+> **Current implementation:** the part of rule 4 about active links whose endpoint was soft-deleted is not yet implemented: such a link keeps its cardinality slot. Rule 5 is enforced, but the rejection is a plain error describing the referential-integrity failure rather than a `REFERENTIAL_INTEGRITY` code.
+
 7. **Soft-delete TTL and auto-purge:** ObjectTypes MAY declare a soft-delete retention period via schema configuration. When configured, the Ontology Engine schedules automatic hard-deletion of soft-deleted objects after the TTL expires.
 
 ```yaml
@@ -729,6 +744,8 @@ interface Transaction {
 }
 ```
 
+On PostgreSQL, an object's row and its version history are written in one transaction. Object create, update and hard delete, and link create, run their AGE graph-mirror operation in the same transaction under a savepoint, so a mirror failure does not fail the write. A link delete does too inside a caller's transaction; standalone, it updates the link row and then runs the mirror operation separately, best effort. An object soft delete issues no mirror operation. A hard delete runs at `READ COMMITTED`: standalone it opens its own transaction; inside a caller's transaction it requires that isolation level and fails with `VALIDATION_ERROR` otherwise.
+
 ### 3.5 Optimistic Concurrency
 
 The SPI supports optimistic concurrency control via the `expectedVersion` parameter on `updateObject` and `updateLink`.
@@ -756,10 +773,10 @@ The project maintains reference implementations for the following backends. Thir
 
 | Provider | Status | Notes |
 |----------|--------|-------|
-| TypeDB | Reference | Best ontological fit. Native polymorphism, rule inference, strong typing. |
-| Neo4j | Reference | Mature graph DB. Needs schema enforcement wrapper. Community edition for OSS. |
-| PostgreSQL + Apache AGE | Reference | Lowest barrier to entry. Graph queries via AGE extension. Best for teams already on PostgreSQL. |
-| In-Memory | Testing | For unit/integration tests. Not for production. |
+| TypeDB | Planned | Best ontological fit. Native polymorphism, rule inference, strong typing. Not in this repository yet. |
+| Neo4j | Planned | Mature graph DB. Needs schema enforcement wrapper. Community edition for OSS. Not in this repository yet. |
+| PostgreSQL + Apache AGE | Reference (shipped) | Lowest barrier to entry. SPI traversal runs over the relational link tables; AGE holds a best-effort graph mirror of objects and links. Best for teams already on PostgreSQL. |
+| In-Memory | Testing (shipped) | For unit/integration tests. Not for production. |
 
 Each provider MUST pass the SPI conformance test suite (see Section 11).
 
@@ -1313,6 +1330,8 @@ The platform core MAY be implemented in TypeScript, but CEL evaluation MUST use 
 4. If `expect: ALL`, all matched links are deleted.
 5. The resolved link IDs are recorded in the audit trail for traceability.
 
+> **Current implementation:** the executor resolves links with cursor-paged provider reads made outside the action transaction (outbound from `from`, or inbound to `to` when only `to` is given), skips deleted links, and deletes the matches inside the transaction. An `expect: ONE` mismatch fails the action with `EFFECT_EXECUTION_ERROR`. On PostgreSQL, links created earlier in the same action are therefore not visible to the resolution; on the memory provider, whose transaction writes through to the store, they can be.
+
 The **Consent** step is REQUIRED when the Security Layer's consent manager is active (i.e., when a Domain Pack enables it). It runs after authorisation because a user can be authorised to perform an action in general but the specific data subject might have withheld consent for the relevant purpose. Consent failures produce a structured error distinct from authorisation failures:
 
 ```json
@@ -1806,7 +1825,16 @@ When a user requests an object but lacks permission for specific fields, the API
 
 Every generated ObjectType includes `_redactedFields: [String!]` and `_consentRestricted: Boolean` (see Section 7.3.1). Clients MAY inspect `_redactedFields` to distinguish "null because the value is null" from "null because you lack permission".
 
-In the TypeScript SDK, redacted fields are typed as `T | null | Redacted`, where `Redacted` is a sentinel value distinct from both `null` and `undefined`:
+The ODL code generator types a nullable `@sensitive` scalar field in its generated TypeScript as `T | null | Redacted` (for a list, `Redacted` joins the element type and the list's own nullability follows the ODL declaration), where `Redacted` is a sentinel distinct from both `null` and `undefined`; its generated transport methods are still stubs and the `sdk-typescript` package is a placeholder, so API clients identify redaction from the wire value and `_redactedFields`.
+
+**Field restrictions on query inputs.** A caller cannot reach a hidden field through a query either. Each check uses the names the client sent, and applies only when the caller has field restrictions:
+
+- **Lists.** REST checks the filter (a REST list takes no sort); GraphQL checks the filter and `orderBy`. `_id` counts as the type's primary field, and only the platform's system fields (`_createdAt`, `_deletedAt`, ...) are exempt. A REST caller who may see no objects of the type gets an empty page before the check; GraphQL checks first.
+- **Saved Object Sets** (REST): executing a set checks its stored filter and sort by the list rules, before the empty-result shortcut; aggregating over a set returns an empty result first for a caller who may see no objects, then checks the set's filter and the aggregation's fields, `groupBy`, filter and `orderBy` by the aggregate rules (the set's own sort is not used).
+- **Aggregates** (REST and GraphQL): fields, `groupBy`, filter, and on REST the fields behind `orderBy` (GraphQL aggregates take no `orderBy`). Each name must be in the caller's visible set (`count(*)` names none); there is no system-field exemption. An `orderBy` may name the aggregate's outputs, by alias or by implicit name (`<fn>_<field>`, such as `count_*`), unless the name is also a declared field, which is then checked as that field. A caller who may see no objects gets an empty result before the check.
+- **Search** (REST and GraphQL): named fields must be visible (`_id` as the primary field; no system-field exemption); a GraphQL search's `filter` follows the list rules. If such a caller names no fields, the API searches the visible, stored (not primary, `@computed` or `@link`), single-valued `String` properties whose names do not start with `_`. An empty list searches nothing: GraphQL `fields: []`, or a REST `fields` value with only separators (`fields=,`); an empty REST `fields=` counts as naming no fields. A caller who may see no objects gets an empty result before the named fields are checked.
+
+A hidden field is refused: REST answers 403 (error code `ACCESS_DENIED` for list filters, saved-set execution and search, `FORBIDDEN` for aggregates), GraphQL with `extensions.openfoundry.code` `FORBIDDEN`. Callers without field restrictions are not checked, and their searches use the provider defaults (§8.1).
 
 #### 7.1.4 Permission Evaluation
 
@@ -2124,6 +2152,8 @@ input FooFilter {
 
 If `supportsFullTextSearch` is `false`, `searchFoos` is omitted from the generated schema for that deployment.
 
+> **Current implementation:** the generator emits per-type search for every ObjectType as `searchFoos(query: String!, fields: [String!], filter: FooFilter, first: Int, after: String): SearchResult_Foo!`, whose result carries scored `hits` (`node`, `score`), `totalCount` and `hasNextPage`. `searchAll` and `typeahead` are not generated yet.
+
 Every generated ObjectType includes `_redactedFields: [String!]` and `_consentRestricted: Boolean` for security and consent transparency (see Sections 7.1.3 and 7.3.1).
 
 #### 8.1.2 Generated Mutation Types
@@ -2187,6 +2217,8 @@ Search contract:
 2. Authorisation and consent filters are applied before result delivery; non-visible matches MUST NOT leak through counts, snippets, or score distributions.
 3. `@indexed` controls exact/structured index creation; a separate `@searchable` directive (or equivalent config) controls full-text inclusion.
 4. Search responses MUST include stable cursors and MAY include highlight snippets when permitted.
+
+> **Current implementation:** only per-type search exists (REST `GET /api/v1/{plural}/search`, GraphQL `searchFoos`). Matching is case-insensitive: PostgreSQL matches the whole query as a substring and scores a hit by the number of matching fields; the memory provider scores by occurrences of each whitespace-separated term. With no `fields` named, PostgreSQL looks in the table's non-system text columns and the memory provider in the object's non-system string values; for a caller with field restrictions who names no fields, the API names that caller's visible, stored, single-valued `String` properties instead (§7.1.3). An empty field list searches nothing (GraphQL `fields: []`, REST `fields=,`; REST `fields=` counts as no fields named). Named fields should be stored text properties: a hidden one is refused (§7.1.3), but other names are not yet validated, and on PostgreSQL a field without a text column fails the request. `@searchable` requests an index but does not decide which fields are searched. Paging is by offset (GraphQL `after` encodes an offset); no result cursor is returned.
 
 ### 8.2 REST API
 
@@ -2408,7 +2440,7 @@ Error categories:
 Transport mapping:
 
 1. GraphQL: error envelope appears in `errors[].extensions.openfoundry`.
-2. REST/FHIR: envelope is returned in response body with HTTP status mapping.
+2. REST: envelope is returned in the response body (`{ "error": { ... } }`) with HTTP status mapping. FHIR: the FHIR handler, including its own authentication and rate-limit answers, returns errors as an `OperationOutcome`; the gateway-wide pre-authentication rate limiter runs first and can answer a FHIR URL with `429` and the REST envelope.
 3. SDKs: typed exceptions are generated from `code` + `category`.
 
 ### 8.9 API Versioning Strategy
@@ -2839,30 +2871,44 @@ Open Foundry ships as a set of OCI-compliant container images.
 
 ### 12.2 Kubernetes Deployment
 
-A Helm chart provides production-grade deployment. Domain Pack versions are explicitly pinned:
+A Helm chart provides production-grade deployment. It needs an external PostgreSQL 17 server with Apache AGE (the chart does not run a database server), an OIDC issuer, an OpenFGA store, a Kafka-compatible broker (the gateway starts without one, but then delivers subscriptions only within each replica, so run a single replica), and a source-system (PAS) database URL, which the chart requires. `deploy/README.md` ("Installing a released version", "Database prerequisites") explains each value used here; `values.yaml` documents every value.
 
 ```bash
-helm install my-instance openfoundry/openfoundry \
-  --set storage.provider=typedb \
-  --set storage.typedb.host=typedb-cluster:1729 \
-  --set eventBus.kafka.bootstrapServers=kafka:9092 \
-  --set auth.oidc.issuer=https://login.microsoftonline.com/tenant \
-  --set domainPacks[0].name=nhs-acute \
-  --set domainPacks[0].version=1.0.0 \
-  --set federation.enabled=true \
-  --set federation.instanceId=nhs-trust-leeds \
-  --set federation.endpoint=https://openfoundry.leeds.nhs.uk \
-  --set observability.otlp.endpoint=https://otel-collector:4318
+# PG_PASSWORD must be URI-safe (letters, digits, - . _ ~): the gateway reads
+# it from a postgresql:// URL. For example: openssl rand -hex 24
+kubectl create secret generic openfoundry-postgres \
+  --from-literal=username=openfoundry --from-literal=password="$PG_PASSWORD"
+kubectl create secret generic openfoundry-pas --from-literal=dbUrl="$PAS_DB_URL"
+
+helm install my-instance oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry \
+  --version "$OPENFOUNDRY_VERSION" \
+  --set storage.postgres.host="$PG_HOST" \
+  --set auth.oidc.issuer="$OIDC_ISSUER" \
+  --set auth.oidc.jwksUri="$OIDC_JWKS_URI" \
+  --set auth.oidc.clientId="$OIDC_CLIENT_ID" \
+  --set auth.oidc.existingSecret= \
+  --set authz.openfga.url="$OPENFGA_URL" \
+  --set authz.openfga.storeId="$OPENFGA_STORE_ID" \
+  --set eventBus.redpanda.bootstrapServers="$KAFKA_BOOTSTRAP" \
+  --set 'domainPacks[0].name=nhs-acute' \
+  --set observability.otlp.endpoint="$OTLP_HTTP_ENDPOINT"
 ```
+
+`--set` splits values on commas, so `KAFKA_BOOTSTRAP` is one `host:port`; give a broker list in a values file. `auth.oidc.jwksUri` is needed for any issuer other than Keycloak (the JWKS URL defaults to Keycloak's path under the issuer). `auth.oidc.existingSecret=` skips the chart's upgrade-time check for an `openfoundry-oidc` Secret, which nothing mounts.
+
+Domain packs are chosen by name, from the packs built into the gateway image and any mounted through `domainPacksExtra`; `core` is always loaded when present, and a mounted pack with the same name as a built-in one is skipped (the built-in pack wins). A `version` given in `domainPacks` is not used. The version loaded is the one in the pack's manifest, listed at `/admin/packs`. Federation settings are not in the chart yet.
 
 ### 12.3 Minimal Development Deployment
 
-For local development, a single Docker Compose file starts the entire stack with the in-memory storage provider:
+For local development, a single Docker Compose file (`deploy/docker-compose.yaml`) starts the entire stack, with PostgreSQL 17 + Apache AGE as the storage provider. `deploy/README.md` has the full quick start:
 
 ```bash
-docker compose up
+cd deploy
+cp .env.example .env          # set POSTGRES_PASSWORD (URI-safe: letters, digits, - . _ ~) and KEYCLOAK_ADMIN_PASSWORD
+docker compose up -d --build
+./init-services.sh            # OpenFGA store and model, once the services are up
 # API available at http://localhost:4000/graphql
-# Admin UI at http://localhost:4000/admin
+# Loaded domain packs at http://localhost:4000/admin/packs
 ```
 
 ### 12.4 Degraded Mode and Outage Behaviour
