@@ -374,6 +374,38 @@ export function registerLinkTests(name: string, factory: ProviderFactory): void 
       });
     });
 
+    // ─── Endpoint visibility (spec §3.3 rule 3) ───
+
+    describe('links to soft-deleted objects', () => {
+      it('getLinks leaves out a link whose other end is soft-deleted, unless asked', async () => {
+        const live = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId2);
+        await provider.deleteObject(tenantA, 'CareTeam', teamId2, 'soft');
+        const page = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound');
+        expect(page.items.map((l) => l._id)).toEqual([live._id]);
+        expect(page.totalCount).toBe(1);
+        const all = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { includeDeleted: true });
+        expect(all.items).toHaveLength(2);
+      });
+
+      it('getLinks of a soft-deleted object is empty unless asked', async () => {
+        await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteObject(tenantA, 'Patient', patientId1, 'soft');
+        expect((await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound')).items).toHaveLength(0);
+        expect(
+          (await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { includeDeleted: true })).items,
+        ).toHaveLength(1);
+      });
+
+      it('getLinks returns links oldest first', async () => {
+        const first = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await new Promise((r) => setTimeout(r, 5));
+        const second = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId2);
+        const page = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound');
+        expect(page.items.map((l) => l._id)).toEqual([first._id, second._id]);
+      });
+    });
+
     // ─── Hard delete of an endpoint (spec §3.3 rule 6) ───
 
     describe('hard delete of an endpoint', () => {

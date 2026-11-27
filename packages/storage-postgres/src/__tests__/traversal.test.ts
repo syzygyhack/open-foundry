@@ -72,6 +72,18 @@ function makeObjectRow(type: string, id: string, overrides: Record<string, unkno
   };
 }
 
+/**
+ * Object rows for an object-table query: one per requested ID (params[1]),
+ * typed after the table (`"ward"` -> Ward), so the start-object and target
+ * visibility checks find what they ask for.
+ */
+function objectRowsFor(sql: string, params: unknown[]): QueryResult {
+  const table = /FROM "[^"]+"\."([a-z_]+)"/.exec(sql)?.[1] ?? '';
+  const type = table.replace(/(^|_)([a-z])/g, (_, __, c: string) => c.toUpperCase());
+  const ids = (params[1] as string[] | undefined) ?? [];
+  return { rows: ids.map((id) => makeObjectRow(type, id)) };
+}
+
 // ════════════════════════════════════════════════════════════════════
 
 describe('traverse()', () => {
@@ -79,12 +91,11 @@ describe('traverse()', () => {
 
   describe('single-step outbound traversal', () => {
     it('follows outbound links from start node', async () => {
-      const pool = createMockPool((sql) => {
+      const pool = createMockPool((sql, params) => {
         if (sql.includes('admitted_to')) {
           return { rows: [makeLinkRow()] };
         }
-        // Object fetch for Ward
-        return { rows: [makeObjectRow('Ward', 'ward-1', { name: 'Ward A' })] };
+        return objectRowsFor(sql, params);
       });
 
       const path: TraversalPath = {
@@ -104,7 +115,7 @@ describe('traverse()', () => {
 
   describe('single-step inbound traversal', () => {
     it('follows inbound links to start node', async () => {
-      const pool = createMockPool((sql) => {
+      const pool = createMockPool((sql, params) => {
         if (sql.includes('admitted_to')) {
           return {
             rows: [makeLinkRow({
@@ -115,7 +126,7 @@ describe('traverse()', () => {
             })],
           };
         }
-        return { rows: [makeObjectRow('Patient', 'patient-1')] };
+        return objectRowsFor(sql, params);
       });
 
       const path: TraversalPath = {
@@ -229,7 +240,7 @@ describe('traverse()', () => {
 
   describe('pagination', () => {
     it('applies limit and offset to returned nodes', async () => {
-      const pool = createMockPool((sql) => {
+      const pool = createMockPool((sql, params) => {
         if (sql.includes('admitted_to')) {
           return {
             rows: [
@@ -239,14 +250,7 @@ describe('traverse()', () => {
             ],
           };
         }
-        // Return objects for all three wards
-        return {
-          rows: [
-            makeObjectRow('Ward', 'ward-1'),
-            makeObjectRow('Ward', 'ward-2'),
-            makeObjectRow('Ward', 'ward-3'),
-          ],
-        };
+        return objectRowsFor(sql, params);
       });
 
       const path: TraversalPath = {
@@ -261,11 +265,13 @@ describe('traverse()', () => {
     });
 
     it('defaults to limit=100, offset=0', async () => {
-      const pool = createMockPool((sql) => {
+      const pool = createMockPool((sql, params) => {
         if (sql.includes('admitted_to')) {
-          return { rows: [makeLinkRow()] };
+          return {
+            rows: Array.from({ length: 101 }, (_, i) => makeLinkRow({ _to_id: `ward-${i}`, _id: `link-${i}` })),
+          };
         }
-        return { rows: [makeObjectRow('Ward', 'ward-1')] };
+        return objectRowsFor(sql, params);
       });
 
       const path: TraversalPath = {
@@ -274,8 +280,8 @@ describe('traverse()', () => {
 
       const result = await traverse(pool, createCtx(), 'patient-1', path);
 
-      // Should return all nodes (only 1)
-      expect(result.nodes).toHaveLength(1);
+      expect(result.nodes).toHaveLength(100);
+      expect(result.totalCount).toBe(101);
     });
   });
 
@@ -309,18 +315,11 @@ describe('traverse()', () => {
 
   describe('multi-step traversal', () => {
     it('breaks traversal when frontier becomes empty', async () => {
-      let queryCount = 0;
-      const pool = createMockPool((_sql) => {
-        queryCount++;
-        // First step returns links, second step returns no links
-        if (queryCount === 1) {
-          return { rows: [makeLinkRow()] };
-        }
-        if (queryCount === 2) {
-          return { rows: [makeObjectRow('Ward', 'ward-1')] };
-        }
-        // Step 2: no links found
-        return { rows: [] };
+      const pool = createMockPool((sql, params) => {
+        // First step finds a link; the second step's link table is empty.
+        if (sql.includes('admitted_to')) return { rows: [makeLinkRow()] };
+        if (sql.includes('bed_in_ward')) return { rows: [] };
+        return objectRowsFor(sql, params);
       });
 
       const path: TraversalPath = {

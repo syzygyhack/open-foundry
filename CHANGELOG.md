@@ -97,6 +97,24 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Traversal and link reads follow the soft-delete rules, on both
+  providers.** Postgres ignored a traversal step's `filter` entirely, and
+  returned edges to targets it then dropped. Both providers traversed from a
+  soft-deleted start object, and `getLinks` returned links to or from a
+  soft-deleted object, which the spec (§3.3 rule 3) leaves out by default. Now
+  a step filter narrows that step's targets, an edge is returned only with its
+  target, and soft-deleted objects and their links are left out unless
+  `includeDeleted` is set. The memory provider's `getLinks` and `traverse` now
+  page like Postgres (oldest first, 100 by default, at most 1000 links). An
+  action's `deleteLink` effect now reads every page of links: it read only the
+  first, so on Postgres (and now on memory) a match past the first 100 links
+  was missed, and `expect: ALL` left the rest. It pages over the view that
+  includes soft-deleted links, so a soft delete during the scan cannot shift
+  a page, skips those links itself (links to a soft-deleted object remain
+  candidates, as before), and reads on after any full page (an exactly full
+  last page within its 1000-page budget is not an error). A link
+  hard-deleted during the scan can still move a later one between pages.
+
 - **Filters treat unset fields the same on both providers.** On Postgres,
   `neq` and `not` silently dropped records whose field was unset (SQL compares
   NULL as unknown), and `eq null` matched nothing; the memory provider matched
@@ -145,7 +163,8 @@ are called out under **Breaking changes**.
   failure) in its own transaction is rerun, up to three attempts, and a
   connection whose `ROLLBACK` fails is discarded rather than pooled. The memory
   provider now also refuses links to missing, soft-deleted or other tenants'
-  objects, as Postgres did.
+  objects, as Postgres did; links it holds from before a schema was applied
+  are found by their endpoints' IDs, for reads and for the cascade.
 
 - **Graph-mirror writes work on databases that do not preload Apache AGE.**
   Without `shared_preload_libraries = 'age'`, the first `cypher()` call in a

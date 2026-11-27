@@ -152,6 +152,53 @@ export function registerLineageTests(name: string, factory: ProviderFactory): vo
         expect(result.nodes[0]!.name).toBe('Alpha');
       });
 
+      it('a step filter drops the edge to a filtered-out target too', async () => {
+        const p = await provider.createObject(tenantA, 'Patient', { name: 'EdgeFilter' });
+        const c1 = await provider.createObject(tenantA, 'CareTeam', { name: 'Alpha' });
+        const c2 = await provider.createObject(tenantA, 'CareTeam', { name: 'Beta' });
+        const kept = await provider.createLink(tenantA, 'AssignedTo', p._id, c1._id);
+        await provider.createLink(tenantA, 'AssignedTo', p._id, c2._id);
+        const result = await provider.traverse(tenantA, p._id, {
+          steps: [{ linkType: 'AssignedTo', direction: 'outbound', filter: { field: 'name', operator: 'eq', value: 'Alpha' } }],
+        });
+        expect(result.edges.map((e) => e._id)).toEqual([kept._id]);
+      });
+
+      it('a soft-deleted target and its edge are not traversed by default', async () => {
+        const p = await provider.createObject(tenantA, 'Patient', { name: 'DelTarget' });
+        const live = await provider.createObject(tenantA, 'CareTeam', { name: 'Live' });
+        const gone = await provider.createObject(tenantA, 'CareTeam', { name: 'Gone' });
+        const keep = await provider.createLink(tenantA, 'AssignedTo', p._id, live._id);
+        await provider.createLink(tenantA, 'AssignedTo', p._id, gone._id);
+        await provider.deleteObject(tenantA, 'CareTeam', gone._id, 'soft');
+        const path = { steps: [{ linkType: 'AssignedTo', direction: 'outbound' as const }] };
+        const result = await provider.traverse(tenantA, p._id, path);
+        expect(result.nodes.map((n) => n._id)).toEqual([live._id]);
+        expect(result.edges.map((e) => e._id)).toEqual([keep._id]);
+        const all = await provider.traverse(tenantA, p._id, path, { includeDeleted: true });
+        expect(all.nodes).toHaveLength(2);
+      });
+
+      it('traversal from a soft-deleted start object finds nothing by default', async () => {
+        const p = await provider.createObject(tenantA, 'Patient', { name: 'DelStart' });
+        const c = await provider.createObject(tenantA, 'CareTeam', { name: 'Reachable' });
+        await provider.createLink(tenantA, 'AssignedTo', p._id, c._id);
+        await provider.deleteObject(tenantA, 'Patient', p._id, 'soft');
+        const path = { steps: [{ linkType: 'AssignedTo', direction: 'outbound' as const }] };
+        expect((await provider.traverse(tenantA, p._id, path)).nodes).toHaveLength(0);
+        expect((await provider.traverse(tenantA, p._id, path, { includeDeleted: true })).nodes).toHaveLength(1);
+      });
+
+      it('a node reached twice in one step is returned once', async () => {
+        const p = await provider.createObject(tenantA, 'Patient', { name: 'Twice' });
+        const c = await provider.createObject(tenantA, 'CareTeam', { name: 'Same' });
+        await provider.createLink(tenantA, 'AssignedTo', p._id, c._id, { role: 'a' });
+        await provider.createLink(tenantA, 'AssignedTo', p._id, c._id, { role: 'b' });
+        const result = await provider.traverse(tenantA, p._id, { steps: [{ linkType: 'AssignedTo', direction: 'outbound' }] });
+        expect(result.nodes).toHaveLength(1);
+        expect(result.edges).toHaveLength(2);
+      });
+
       it('traversal pagination works correctly', async () => {
         const p = await provider.createObject(tenantA, 'Patient', { name: 'PagStart' });
         const teams = [];

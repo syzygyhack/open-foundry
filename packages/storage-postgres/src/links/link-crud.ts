@@ -448,6 +448,7 @@ export async function getLinks(
   options?: QueryOptions,
   schema = 'public',
   tx?: PgTransaction,
+  endpoints?: { fromType: string; toType: string },
 ): Promise<LinkPage> {
   const q = resolveQueryable(pool, tx);
   const table = linkTableName(linkType, schema);
@@ -463,6 +464,17 @@ export async function getLinks(
 
   if (!options?.includeDeleted) {
     whereClauses.push(`"_deleted_at" IS NULL`);
+    // Spec §3.3 rule 3: links to or from a soft-deleted (or missing) object
+    // are left out by default too. Needs the link type's endpoint types.
+    if (endpoints) {
+      for (const [col, type] of [['_from_id', endpoints.fromType], ['_to_id', endpoints.toType]] as const) {
+        whereClauses.push(
+          `EXISTS (SELECT 1 FROM ${pgIdent(schema)}.${pgIdent(snakeCase(type))} o
+                    WHERE o."_tenant_id" = ${table}."_tenant_id" AND o."_id" = ${table}."${col}"
+                      AND o."_deleted_at" IS NULL)`,
+        );
+      }
+    }
   }
 
   const whereClause = whereClauses.join(' AND ');

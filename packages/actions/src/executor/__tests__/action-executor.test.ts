@@ -8,7 +8,7 @@
  * transaction rollback on effect failure.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { MemoryStorageProvider } from '@openfoundry/storage-memory';
 import type { ParsedSchema } from '@openfoundry/odl';
@@ -20,7 +20,7 @@ import type {
 } from '@openfoundry/spi';
 
 import { parseActionManifest } from '../../parser/index.js';
-import { ActionExecutor } from '../action-executor.js';
+import { ActionExecutor, readLinkPages } from '../action-executor.js';
 import type {
   ActionActor,
   ActionContext,
@@ -1250,6 +1250,174 @@ effects:
       expect(result.errors[0]!.message).toContain('expected exactly ONE');
     });
 
+    /**
+     * Links from the patient to `n` new wards, then (if given) to `last`, each
+     * created a millisecond after the one before: getLinks orders by creation
+     * time, then ID, and links made in the same millisecond can sort by ID in
+     * either order, which would let `last` land on the first page.
+     */
+    async function seedLinks(n: number, last?: string): Promise<{ wards: string[]; lastLink?: string }> {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        let t = Date.parse('2026-01-01T00:00:00Z');
+        const wards: string[] = [];
+        for (let i = 0; i < n; i++) {
+          vi.setSystemTime(t++);
+          const w = await storage.createObject(REQ_CTX, 'Ward', { name: `Filler ${i}` });
+          wards.push(w._id);
+          await storage.createLink(REQ_CTX, 'AdmittedTo', patient._id, w._id);
+        }
+        if (last === undefined) return { wards };
+        vi.setSystemTime(t++);
+        const link = await storage.createLink(REQ_CTX, 'AdmittedTo', patient._id, last);
+        return { wards, lastLink: link._id };
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+
+    /** The link is not on the first page of 1000 (the executor's page size). */
+    async function expectOnPageTwo(linkId: string): Promise<void> {
+      const first = await storage.getLinks(REQ_CTX, patient._id, 'AdmittedTo', 'outbound', { limit: 1000 });
+      expect(first.hasNextPage).toBe(true);
+      expect(first.items.map((l) => l._id)).not.toContain(linkId);
+    }
+
+    it('finds a matching link past the first page of getLinks', async () => {
+      // 1000 links come first; the one the filter names is the 1001st, on the
+      // second page (the executor reads pages of 1000; a provider returns at
+      // most 1000 per page).
+      const { lastLink } = await seedLinks(1000, ward._id);
+      await expectOnPageTwo(lastLink!);
+
+      const yaml = `
+action: TransferWard
+version: 1
+effects:
+  - type: deleteLink
+    linkType: "AdmittedTo"
+    filter:
+      from: "patient"
+      to: "toWard"
+      active: true
+    expect: ONE
+`;
+      const { manifest } = parseActionManifest(yaml);
+      const result = await executor.execute(
+        manifest!,
+        { patient: patient._id, toWard: ward._id },
+        ACTOR,
+        ACTION_CTX,
+        NHS_SCHEMA,
+      );
+
+      expect(result.errors).toEqual([]);
+      expect(result.success).toBe(true);
+      const live = await storage.getLinks(REQ_CTX, patient._id, 'AdmittedTo', 'outbound', { limit: 1000 });
+      expect(live.totalCount).toBe(1000);
+      expect(live.items.map((l) => l._id)).not.toContain(lastLink);
+    });
+
+    it('expect: ALL deletes links past the first page too', async () => {
+      await seedLinks(1001);
+      const yaml = `
+action: DischargePatient
+version: 1
+effects:
+  - type: deleteLink
+    linkType: "AdmittedTo"
+    filter:
+      from: "patient"
+      active: true
+    expect: ALL
+`;
+      const { manifest } = parseActionManifest(yaml);
+      const result = await executor.execute(manifest!, { patient: patient._id }, ACTOR, ACTION_CTX, NHS_SCHEMA);
+
+      expect(result.success).toBe(true);
+      const left = await storage.getLinks(REQ_CTX, patient._id, 'AdmittedTo', 'outbound');
+      expect(left.totalCount).toBe(0);
+    });
+
+    it('does not miss a link when an earlier one drops out of view between pages', async () => {
+      const { wards, lastLink } = await seedLinks(1000, ward._id);
+      const first = wards[0]!;
+      await expectOnPageTwo(lastLink!);
+
+      // After the first page is read, the first link's ward is soft-deleted,
+      // which takes that link out of getLinks' default view.
+      const real = storage.getLinks.bind(storage);
+      let calls = 0;
+      let pages = 0;
+      (storage as unknown as { getLinks: typeof storage.getLinks }).getLinks = async (...args) => {
+        const page = await real(...args);
+        pages++;
+        if (++calls === 1) await storage.deleteObject(REQ_CTX, 'Ward', first, 'soft');
+        return page;
+      };
+
+      const yaml = `
+action: TransferWard
+version: 1
+effects:
+  - type: deleteLink
+    linkType: "AdmittedTo"
+    filter:
+      from: "patient"
+      to: "toWard"
+      active: true
+    expect: ONE
+`;
+      const { manifest } = parseActionManifest(yaml);
+      const result = await executor.execute(
+        manifest!,
+        { patient: patient._id, toWard: ward._id },
+        ACTOR,
+        ACTION_CTX,
+        NHS_SCHEMA,
+      );
+
+      expect(pages).toBeGreaterThanOrEqual(2);
+      expect(result.errors).toEqual([]);
+      expect(result.success).toBe(true);
+    });
+
+    it('reads on after a full page even when hasNextPage says it was the last', async () => {
+      // Postgres counts and pages in separate statements: a link committed
+      // between them pushes one past the page while the count said 1000.
+      const { lastLink } = await seedLinks(1000, ward._id);
+      await expectOnPageTwo(lastLink!);
+      const real = storage.getLinks.bind(storage);
+      (storage as unknown as { getLinks: typeof storage.getLinks }).getLinks = async (...args) => {
+        const page = await real(...args);
+        return (args[4]?.offset ?? 0) === 0 ? { ...page, hasNextPage: false, totalCount: 1000 } : page;
+      };
+
+      const yaml = `
+action: TransferWard
+version: 1
+effects:
+  - type: deleteLink
+    linkType: "AdmittedTo"
+    filter:
+      from: "patient"
+      to: "toWard"
+      active: true
+    expect: ONE
+`;
+      const { manifest } = parseActionManifest(yaml);
+      const result = await executor.execute(
+        manifest!,
+        { patient: patient._id, toWard: ward._id },
+        ACTOR,
+        ACTION_CTX,
+        NHS_SCHEMA,
+      );
+
+      expect(result.errors).toEqual([]);
+      expect(result.success).toBe(true);
+    });
+
     it('expect: ALL succeeds even when zero links match', async () => {
       // Patient has no OccupiesBed links
       const deleteAllYaml = `
@@ -1817,5 +1985,30 @@ effects:
         resource: `patient:${patient._id}`,
       });
     });
+  });
+});
+
+describe('readLinkPages', () => {
+  const links = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ _id: `l${i}` }) as unknown as import('@openfoundry/spi').OntologyLink);
+  // A provider over `all` links whose hasNextPage says no on the page that
+  // ends at `claimLastAt` (a stale count).
+  const pages = (all: ReturnType<typeof links>, claimLastAt = all.length) =>
+    async (offset: number, limit: number) => {
+      const items = all.slice(offset, offset + limit);
+      return { items, hasNextPage: offset + items.length < claimLastAt };
+    };
+
+  it('ends on an exactly full last page within the page budget', async () => {
+    // 3 pages of 2, the last one full: the fourth read comes back empty.
+    await expect(readLinkPages(pages(links(6)), 'scan', 2, 3)).resolves.toHaveLength(6);
+  });
+
+  it('fails when there are more pages than the budget', async () => {
+    await expect(readLinkPages(pages(links(7)), 'scan', 2, 3)).rejects.toThrow(/did not reach its last page after 3 pages/);
+  });
+
+  it('reads past a full page whose hasNextPage is stale', async () => {
+    await expect(readLinkPages(pages(links(5), 2), 'scan', 2, 5)).resolves.toHaveLength(5);
   });
 });

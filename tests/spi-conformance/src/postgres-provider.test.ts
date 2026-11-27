@@ -36,10 +36,6 @@ const knownFailures: KnownFailures = {
     reason: 'Postgres throws (column does not exist) where memory returns no rows; undecided which is the contract.',
     error: /^column "nonexistent" does not exist$/,
   },
-  'Lineage > lineage via graph traversal > traversal with filters narrows results': {
-    reason: 'traverse returns both edges where the step filter should leave one; not yet investigated.',
-    error: /^expected \[ \{ …\(\d+\) \}, \{ …\(\d+\) \} \] to have a length of 1 but got 2$/,
-  },
 };
 
 if (!PG_TEST_URL) {

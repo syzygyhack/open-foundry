@@ -1,13 +1,12 @@
 /**
- * Graph traversal using Apache AGE Cypher queries.
- *
- * Translates TraversalPath steps into Cypher MATCH patterns,
- * then falls back to SQL-based traversal when AGE is unavailable.
+ * Graph traversal over the link and object tables (SQL). The AGE graph is a
+ * best-effort mirror and is not read here.
  *
  * Every traversal:
  * - Enforces tenant isolation
- * - Filters out soft-deleted nodes/edges by default
- * - Respects depth limits from TraversalOptions
+ * - Filters out soft-deleted links and nodes by default, the start node included
+ * - Applies each step's filter to that step's targets
+ * - Respects depth and node limits
  */
 
 import type { Pool } from 'pg';
@@ -19,9 +18,12 @@ import type {
   OntologyObject,
   OntologyLink,
   DateTime,
+  FilterExpression,
 } from '@openfoundry/spi';
 import { snakeCase, pgIdent } from '../schema/type-mapping.js';
 import { PgTransaction, resolveQueryable } from '../transactions/index.js';
+import type { Queryable } from '../transactions/index.js';
+import { filterToSql } from '../objects/filter-to-sql.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -88,20 +90,28 @@ function rowToLink(row: Record<string, unknown>): OntologyLink {
 }
 
 // ---------------------------------------------------------------------------
-// SQL-based traversal (fallback when AGE unavailable)
+// SQL-based traversal
 // ---------------------------------------------------------------------------
 
+const MAX_TRAVERSAL_DEPTH = 10;
+const MAX_TRAVERSAL_NODES = 10_000;
+
+function objectTable(schema: string, type: string): string {
+  return `${pgIdent(schema)}.${pgIdent(snakeCase(type))}`;
+}
+
 /**
- * Traverse a graph path using SQL JOINs on link tables.
- *
- * This is the primary traversal implementation. It walks through each step
- * in the TraversalPath sequentially, collecting nodes and edges along the way.
- *
- * For each step:
- * 1. Query the link table for matching links from/to current node set
- * 2. Collect the link rows (edges)
- * 3. Resolve the target object IDs for the next hop
- * 4. Repeat until all steps are consumed
+ * Walk the path from startId with SQL over the link and object tables, one
+ * step per hop, as the memory provider does:
+ * - each step follows links of its type in its direction from the frontier
+ *   (keyed by type and ID), keeps the targets that are visible and pass the
+ *   step's filter, and records an edge only for a target it keeps;
+ * - by default soft-deleted links and objects are not traversed, the start
+ *   object included (spec §3.3 rule 3);
+ * - at most MAX_TRAVERSAL_NODES nodes are taken in total, checked within each
+ *   hop;
+ * - returns the last step's nodes, in the order first reached, paginated
+ *   (default 100), and every recorded edge.
  */
 export async function traverse(
   pool: Pool,
@@ -116,113 +126,136 @@ export async function traverse(
   const includeDeleted = options?.includeDeleted ?? false;
 
   // PERF-03: Enforce maximum traversal depth to prevent resource exhaustion
-  const MAX_TRAVERSAL_DEPTH = 10;
   if (path.steps.length > MAX_TRAVERSAL_DEPTH) {
     throw new Error(`Traversal depth ${path.steps.length} exceeds maximum of ${MAX_TRAVERSAL_DEPTH}`);
   }
 
-  // Only the final step's nodes are returned; all edges are collected.
-  // This matches the memory provider behavior (per SPI spec).
-  let stepNodes: OntologyObject[] = [];
-  const allEdges: OntologyLink[] = [];
-
-  // Maximum nodes to collect during traversal to prevent resource exhaustion
-  const MAX_TRAVERSAL_NODES = 10_000;
-
-  // Current frontier: set of object IDs we're traversing from
-  let currentIds = [startId];
+  const edges = new Map<string, OntologyLink>();
+  let stepNodes = new Map<string, OntologyObject>();
+  // The start object's type is not known yet: its links give it.
+  let frontier: Array<{ type: string | undefined; id: string }> = [{ type: undefined, id: startId }];
   let totalNodesSeen = 0;
 
-  for (const step of path.steps) {
-    if (currentIds.length === 0) break;
-    if (totalNodesSeen >= MAX_TRAVERSAL_NODES) break;
+  for (const [stepIndex, step] of path.steps.entries()) {
+    if (frontier.length === 0) break;
+    const outbound = step.direction === 'outbound';
+    const srcIdCol = outbound ? '_from_id' : '_to_id';
+    const srcTypeCol = outbound ? '_from_type' : '_to_type';
+    const tgtIdCol = outbound ? '_to_id' : '_from_id';
+    const tgtTypeCol = outbound ? '_to_type' : '_from_type';
 
-    // Reset step nodes — only the final step's results are returned
-    stepNodes = [];
+    // 1. Links of this step's type from the frontier.
+    const ids = frontier.map((f) => f.id);
+    const params: unknown[] = [ctx.tenantId, ids];
+    let where = `"_tenant_id" = $1 AND "${srcIdCol}" = ANY($2::text[])`;
+    if (!includeDeleted) where += ` AND "_deleted_at" IS NULL`;
+    const linkRows = (
+      await q.query(
+        `SELECT * FROM ${pgIdent(schema)}.${pgIdent(snakeCase(step.linkType))} WHERE ${where}
+          ORDER BY "_created_at" ASC, "_id" ASC`,
+        params,
+      )
+    ).rows as Record<string, unknown>[];
+    const frontierKeys = new Set(frontier.filter((f) => f.type !== undefined).map((f) => `${f.type}:${f.id}`));
+    let candidates = linkRows.filter(
+      (r) => stepIndex === 0 || frontierKeys.has(`${r[srcTypeCol] as string}:${r[srcIdCol] as string}`),
+    );
 
-    const linkTable = `${pgIdent(schema)}.${pgIdent(snakeCase(step.linkType))}`;
-
-    // Build query based on direction
-    let dirCol: string;
-    let targetCol: string;
-    let targetTypeCol: string;
-
-    if (step.direction === 'outbound') {
-      dirCol = '"_from_id"';
-      targetCol = '"_to_id"';
-      targetTypeCol = '"_to_type"';
-    } else {
-      dirCol = '"_to_id"';
-      targetCol = '"_from_id"';
-      targetTypeCol = '"_from_type"';
-    }
-
-    // Build WHERE clause
-    const placeholders = currentIds.map((_, i) => `$${i + 2}`).join(', ');
-    const params: unknown[] = [ctx.tenantId, ...currentIds];
-
-    let whereClause = `"_tenant_id" = $1 AND ${dirCol} IN (${placeholders})`;
-    if (!includeDeleted) {
-      whereClause += ` AND "_deleted_at" IS NULL`;
-    }
-
-    const linkSql = `SELECT * FROM ${linkTable} WHERE ${whereClause}`;
-    const linkResult = await q.query(linkSql, params);
-
-    const linkRows = linkResult.rows as Record<string, unknown>[];
-    const edges = linkRows.map((row) => rowToLink(row));
-    allEdges.push(...edges);
-
-    // Collect target IDs and types for next hop
-    const targetEntries = new Map<string, string>(); // id -> type
-    for (const row of linkRows) {
-      const targetId = row[targetCol.replace(/"/g, '')] as string;
-      const targetType = row[targetTypeCol.replace(/"/g, '')] as string;
-      targetEntries.set(targetId, targetType);
-    }
-
-    // Fetch target objects
-    // Group by type for efficient querying
-    const byType = new Map<string, string[]>();
-    for (const [id, type] of targetEntries) {
-      const ids = byType.get(type) ?? [];
-      ids.push(id);
-      byType.set(type, ids);
-    }
-
-    const nextIds: string[] = [];
-    for (const [type, ids] of byType) {
-      const objTable = `${pgIdent(schema)}.${pgIdent(snakeCase(type))}`;
-      const idPlaceholders = ids.map((_, i) => `$${i + 2}`).join(', ');
-      const objParams: unknown[] = [ctx.tenantId, ...ids];
-
-      let objWhere = `"_tenant_id" = $1 AND "_id" IN (${idPlaceholders})`;
-      if (!includeDeleted) {
-        objWhere += ` AND "_deleted_at" IS NULL`;
-      }
-
-      const objSql = `SELECT * FROM ${objTable} WHERE ${objWhere}`;
-      const objResult = await q.query(objSql, objParams);
-
-      const objects = (objResult.rows as Record<string, unknown>[]).map(
-        (row) => rowToObject(row),
+    // 2. The start object must itself be visible (later frontiers are targets
+    //    already checked).
+    if (stepIndex === 0) {
+      const visible = await visibleKeys(
+        q, ctx, schema,
+        candidates.map((r) => ({ type: r[srcTypeCol] as string, id: r[srcIdCol] as string })),
+        includeDeleted, undefined,
       );
-      stepNodes.push(...objects);
-      totalNodesSeen += objects.length;
-      nextIds.push(...objects.map((o) => o._id));
+      candidates = candidates.filter((r) => visible.has(`${r[srcTypeCol] as string}:${r[srcIdCol] as string}`));
     }
 
-    currentIds = nextIds;
+    // 3. Targets that are visible and pass the step filter.
+    const targets = await visibleObjects(
+      q, ctx, schema,
+      candidates.map((r) => ({ type: r[tgtTypeCol] as string, id: r[tgtIdCol] as string })),
+      includeDeleted, step.filter, MAX_TRAVERSAL_NODES - totalNodesSeen,
+    );
+
+    // 4. Edges and nodes, in link order.
+    const nextNodes = new Map<string, OntologyObject>();
+    for (const r of candidates) {
+      const key = `${r[tgtTypeCol] as string}:${r[tgtIdCol] as string}`;
+      const target = targets.get(key);
+      if (!target) continue;
+      edges.set(`${r['_type'] as string}:${r['_id'] as string}`, rowToLink(r));
+      if (!nextNodes.has(key)) nextNodes.set(key, target);
+    }
+    totalNodesSeen += nextNodes.size;
+    stepNodes = nextNodes;
+    frontier = Array.from(nextNodes.values()).map((n) => ({ type: n._type, id: n._id }));
   }
 
-  // Apply pagination
   const limit = options?.limit ?? 100;
   const offset = options?.offset ?? 0;
-  const paginatedNodes = stepNodes.slice(offset, offset + limit);
-
+  const nodes = Array.from(stepNodes.values());
   return {
-    nodes: paginatedNodes,
-    edges: allEdges,
-    totalCount: stepNodes.length,
+    nodes: nodes.slice(offset, offset + limit),
+    edges: Array.from(edges.values()),
+    totalCount: nodes.length,
   };
+}
+
+async function visibleKeys(
+  q: Queryable,
+  ctx: RequestContext,
+  schema: string,
+  refs: Array<{ type: string; id: string }>,
+  includeDeleted: boolean,
+  filter: FilterExpression | undefined,
+): Promise<Set<string>> {
+  return new Set((await visibleObjects(q, ctx, schema, refs, includeDeleted, filter, Infinity)).keys());
+}
+
+/**
+ * The referenced objects that exist in this tenant, are not soft-deleted
+ * (unless includeDeleted) and pass filter, keyed type:id, at most budget of
+ * them.
+ */
+async function visibleObjects(
+  q: Queryable,
+  ctx: RequestContext,
+  schema: string,
+  refs: Array<{ type: string; id: string }>,
+  includeDeleted: boolean,
+  filter: FilterExpression | undefined,
+  budget: number,
+): Promise<Map<string, OntologyObject>> {
+  const byType = new Map<string, Set<string>>();
+  for (const { type, id } of refs) {
+    if (!byType.has(type)) byType.set(type, new Set());
+    byType.get(type)!.add(id);
+  }
+  const found = new Map<string, OntologyObject>();
+  for (const [type, idSet] of byType) {
+    if (found.size >= budget) break;
+    const params: unknown[] = [ctx.tenantId, Array.from(idSet)];
+    let where = `"_tenant_id" = $1 AND "_id" = ANY($2::text[])`;
+    if (!includeDeleted) where += ` AND "_deleted_at" IS NULL`;
+    if (filter) {
+      const fragment = filterToSql(filter, params.length + 1);
+      if (fragment.text !== 'TRUE') {
+        where += ` AND (${fragment.text})`;
+        params.push(...fragment.params);
+      }
+    }
+    let sql = `SELECT * FROM ${objectTable(schema, type)} WHERE ${where}`;
+    if (Number.isFinite(budget)) {
+      params.push(budget - found.size);
+      sql += ` LIMIT $${params.length}`;
+    }
+    const rows = (await q.query(sql, params)).rows as Record<string, unknown>[];
+    for (const row of rows) {
+      const obj = rowToObject(row);
+      found.set(`${type}:${obj._id}`, obj);
+    }
+  }
+  return found;
 }

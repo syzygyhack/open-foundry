@@ -802,4 +802,37 @@ describe('MemoryStorageProvider', () => {
       await expect(provider.ensureIndex(tenantA, 'Patient', { field: 'name', indexType: 'BTREE' })).resolves.toBeUndefined();
     });
   });
+
+  describe('links made with no schema applied', () => {
+    // Their endpoint types are recorded as 'unknown'; they must still be read,
+    // traversed, hidden and cascaded like any other link.
+    it('are read, traversed, hidden with a soft-deleted endpoint, and cascade on hard delete', async () => {
+      const bare = new MemoryStorageProvider();
+      const a = await bare.createObject(tenantA, 'Patient', { name: 'A' });
+      const b = await bare.createObject(tenantA, 'CareTeam', { name: 'B' });
+      const c = await bare.createObject(tenantA, 'CareTeam', { name: 'C' });
+      await bare.createLink(tenantA, 'AssignedTo', a._id, b._id);
+      await bare.createLink(tenantA, 'AssignedTo', a._id, c._id);
+
+      const live = await bare.getLinks(tenantA, a._id, 'AssignedTo', 'outbound');
+      expect(live.items.map((l) => l._toId).sort()).toEqual([b._id, c._id].sort());
+      const reached = await bare.traverse(tenantA, a._id, { steps: [{ linkType: 'AssignedTo', direction: 'outbound' }] });
+      expect(reached.nodes.map((n) => n._id).sort()).toEqual([b._id, c._id].sort());
+
+      await bare.deleteObject(tenantA, 'CareTeam', b._id, 'soft');
+      expect((await bare.getLinks(tenantA, a._id, 'AssignedTo', 'outbound')).items.map((l) => l._toId)).toEqual([c._id]);
+
+      await bare.deleteObject(tenantA, 'CareTeam', c._id, 'hard');
+      const all = await bare.getLinks(tenantA, a._id, 'AssignedTo', 'outbound', { includeDeleted: true });
+      expect(all.items.map((l) => l._toId)).toEqual([b._id]);
+    });
+
+    it("do not reach another tenant's object", async () => {
+      const bare = new MemoryStorageProvider();
+      const a = await bare.createObject(tenantA, 'Patient', { name: 'A' });
+      const other = await bare.createObject(tenantB, 'CareTeam', { name: 'B' });
+      await bare.createLink(tenantA, 'AssignedTo', a._id, other._id);
+      expect((await bare.getLinks(tenantA, a._id, 'AssignedTo', 'outbound')).items).toEqual([]);
+    });
+  });
 });

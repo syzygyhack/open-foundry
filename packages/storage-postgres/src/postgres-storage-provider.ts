@@ -605,7 +605,11 @@ export class PostgresStorageProvider implements StorageProvider {
     direction: 'inbound' | 'outbound',
     options?: QueryOptions,
   ): Promise<LinkPage> {
-    return withRetry(() => pgGetLinks(this._pool, ctx, objectId, linkType, direction, options, this._dataSchema));
+    const def = this._getLinkTypeDef(linkType);
+    const endpoints = def ? { fromType: def.fromType, toType: def.toType } : undefined;
+    return withRetry(() =>
+      pgGetLinks(this._pool, ctx, objectId, linkType, direction, options, this._dataSchema, undefined, endpoints),
+    );
   }
 
   async traverse(

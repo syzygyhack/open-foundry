@@ -60,6 +60,38 @@ function failResult(actionId: string, errors: ActionError[]): ActionResult {
 }
 
 /**
+ * Every live link from offset pages (see ActionExecutor.allLinks for why the
+ * pages include soft-deleted links and why a full page is always followed by
+ * another read). At most `maxPages` pages of links are read, plus one more
+ * read that must come back empty: a scan whose last page is exactly full
+ * still ends, and one with more pages than that is an error rather than an
+ * endless loop.
+ * @internal exported for tests
+ */
+export async function readLinkPages(
+  fetch: (offset: number, limit: number) => Promise<{ items: OntologyLink[]; hasNextPage: boolean }>,
+  what: string,
+  pageSize = 1000,
+  maxPages = 1000,
+): Promise<OntologyLink[]> {
+  const seen = new Set<string>();
+  const out: OntologyLink[] = [];
+  for (let pageNo = 0; ; pageNo++) {
+    const page = await fetch(pageNo * pageSize, pageSize);
+    if (pageNo === maxPages) {
+      if (page.items.length === 0) return out;
+      throw new Error(`${what} did not reach its last page after ${maxPages} pages`);
+    }
+    for (const link of page.items) {
+      if (link._deletedAt || seen.has(link._id)) continue;
+      seen.add(link._id);
+      out.push(link);
+    }
+    if (page.items.length === 0 || (!page.hasNextPage && page.items.length < pageSize)) return out;
+  }
+}
+
+/**
  * Add an `id` alias for `_id` on an OntologyObject so CEL expressions can
  * reference `object.id` (the ODL @primary name) as well as `object._id`.
  */
@@ -840,29 +872,20 @@ export class ActionExecutor {
       }
     }
 
-    // Query links from SPI
+    // Query links from SPI, every page: getLinks returns one page (100 links
+    // by default), and a link past it would otherwise be silently missed.
     const results: OntologyLink[] = [];
 
     if (fromId) {
-      const page = await this.config.storage.getLinks(
-        reqCtx,
-        fromId,
-        effect.linkType,
-        'outbound',
-      );
-      for (const link of page.items) {
+      const links = await this.allLinks(reqCtx, fromId, effect.linkType, 'outbound');
+      for (const link of links) {
         if (toId && link._toId !== toId) continue;
         if (effect.filter.active !== undefined && effect.filter.active && link._deletedAt) continue;
         results.push(link);
       }
     } else if (toId) {
-      const page = await this.config.storage.getLinks(
-        reqCtx,
-        toId,
-        effect.linkType,
-        'inbound',
-      );
-      for (const link of page.items) {
+      const links = await this.allLinks(reqCtx, toId, effect.linkType, 'inbound');
+      for (const link of links) {
         if (effect.filter.active !== undefined && effect.filter.active && link._deletedAt) continue;
         results.push(link);
       }
@@ -870,6 +893,44 @@ export class ActionExecutor {
 
     return results;
   }
+
+  /**
+   * Every live link of a type in one direction, following hasNextPage.
+   *
+   * Pages are read with includeDeleted: in that view (oldest first, then by
+   * ID) a soft delete keeps the row, so it cannot move later links back
+   * across a page boundary. The default view drops a link as soon as it, or
+   * its far endpoint, is soft deleted, which moves every later link back a
+   * place and lets one fall between two pages. Soft-deleted links are then
+   * left out here, so links to a soft-deleted object are still candidates,
+   * as they were before getLinks hid them.
+   *
+   * Offset pages are not a snapshot, though. A link committed during the
+   * scan can sort among links already read (Postgres stamps it with its
+   * transaction's start time) and push one forward: that one is read again
+   * on the next page (links are de-duplicated by ID). A full page is
+   * therefore always followed by another read, even if hasNextPage says no:
+   * on Postgres the count behind hasNextPage and the page itself are separate
+   * statements, and a link pushed forward between them would otherwise be
+   * left on a page nobody reads. What remains is a link hard-deleted during
+   * the scan (directly, or by a hard delete of an endpoint), which moves
+   * later links back, so one can fall between two pages; closing that needs
+   * a snapshot or keyset read from storage. A provider that never reports
+   * the last page is an error rather than an endless loop.
+   */
+  private async allLinks(
+    reqCtx: RequestContext,
+    objectId: string,
+    linkType: string,
+    direction: 'inbound' | 'outbound',
+  ): Promise<OntologyLink[]> {
+    return readLinkPages(
+      (offset, limit) =>
+        this.config.storage.getLinks(reqCtx, objectId, linkType, direction, { limit, offset, includeDeleted: true }),
+      `getLinks(${linkType}, ${direction})`,
+    );
+  }
+
 
   // ─── Expression resolution ───
 

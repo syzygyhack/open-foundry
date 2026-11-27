@@ -50,6 +50,9 @@ function now(): DateTime {
   return new Date().toISOString() as DateTime;
 }
 
+/** Endpoint type recorded on a link made with no schema applied. */
+const UNKNOWN_ENDPOINT_TYPE = 'unknown';
+
 function isFieldPredicate(f: FilterExpression): f is FieldPredicate {
   return 'field' in f && 'operator' in f;
 }
@@ -469,8 +472,11 @@ export class MemoryStorageProvider implements StorageProvider {
     const links: Array<[string, OntologyLink]> = [];
     for (const [linkKey, link] of this._links) {
       if (link._tenantId !== ctx.tenantId) continue;
-      const touches =
-        (link._fromType === type && link._fromId === id) || (link._toType === type && link._toId === id);
+      // An 'unknown' endpoint type (a link made with no schema applied)
+      // matches by ID, as the endpoint lookup does.
+      const at = (linkType: string, linkId: string) =>
+        linkId === id && (linkType === type || linkType === UNKNOWN_ENDPOINT_TYPE);
+      const touches = at(link._fromType, link._fromId) || at(link._toType, link._toId);
       if (touches) links.push([linkKey, clone(link)]);
     }
     for (const [linkKey] of links) this._links.delete(linkKey);
@@ -516,9 +522,9 @@ export class MemoryStorageProvider implements StorageProvider {
       _tenantId: ctx.tenantId,
       _type: type,
       _id: id,
-      _fromType: def?.fromType ?? 'unknown',
+      _fromType: def?.fromType ?? UNKNOWN_ENDPOINT_TYPE,
       _fromId: fromId,
-      _toType: def?.toType ?? 'unknown',
+      _toType: def?.toType ?? UNKNOWN_ENDPOINT_TYPE,
       _toId: toId,
       _version: 1,
       _createdAt: timestamp,
@@ -971,6 +977,30 @@ export class MemoryStorageProvider implements StorageProvider {
     this._doDeleteLink(ctx, type, linkId);
   }
 
+  /** An object of this tenant that exists and, unless deleted ones are wanted, is not soft-deleted. */
+  private _visibleObject(
+    ctx: RequestContext,
+    type: string,
+    id: string,
+    includeDeleted: boolean,
+  ): OntologyObject | undefined {
+    // A link made with no schema applied records its endpoint types as
+    // 'unknown': find such an endpoint by tenant and ID.
+    const obj =
+      type === UNKNOWN_ENDPOINT_TYPE
+        ? [...this._objects.values()].find((o) => o._id === id && o._tenantId === ctx.tenantId)
+        : this._objects.get(`${type}:${id}`);
+    if (!obj || obj._tenantId !== ctx.tenantId) return undefined;
+    if (!includeDeleted && obj._deletedAt) return undefined;
+    return obj;
+  }
+
+  /**
+   * Links of one type from or to an object, oldest first (creation time, then
+   * ID), as on Postgres. By default soft-deleted links, and links whose other
+   * end (or this end) is soft-deleted or gone, are left out (spec §3.3 rule
+   * 3); includeDeleted returns them all. Default page size 100, at most 1000.
+   */
   async getLinks(
     ctx: RequestContext,
     objectId: string,
@@ -978,17 +1008,25 @@ export class MemoryStorageProvider implements StorageProvider {
     direction: 'inbound' | 'outbound',
     options?: QueryOptions,
   ): Promise<LinkPage> {
+    const includeDeleted = options?.includeDeleted ?? false;
     let items = Array.from(this._links.values()).filter((link) => {
       if (link._tenantId !== ctx.tenantId) return false;
       if (link._type !== linkType) return false;
-      if (!options?.includeDeleted && link._deletedAt) return false;
-      if (direction === 'outbound') return link._fromId === objectId;
-      return link._toId === objectId;
+      if (direction === 'outbound' ? link._fromId !== objectId : link._toId !== objectId) return false;
+      if (includeDeleted) return true;
+      if (link._deletedAt) return false;
+      return (
+        this._visibleObject(ctx, link._fromType, link._fromId, false) !== undefined &&
+        this._visibleObject(ctx, link._toType, link._toId, false) !== undefined
+      );
     });
+    items.sort((x, y) =>
+      x._createdAt < y._createdAt ? -1 : x._createdAt > y._createdAt ? 1 : x._id < y._id ? -1 : x._id > y._id ? 1 : 0,
+    );
 
     const totalCount = items.length;
     const offset = options?.offset ?? 0;
-    const limit = options?.limit ?? items.length;
+    const limit = Math.min(options?.limit ?? 100, 1000);
     items = items.slice(offset, offset + limit);
 
     return {
@@ -998,6 +1036,16 @@ export class MemoryStorageProvider implements StorageProvider {
     };
   }
 
+  /**
+   * Walk the path from startId, one step per hop. Each step follows links of
+   * its type in its direction from the current frontier, keeps the targets
+   * that are visible and pass the step's filter, and records an edge only
+   * for a target it keeps. Nodes and the frontier are keyed by type and ID.
+   * By default soft-deleted links and objects are not traversed, the start
+   * object included (spec §3.3 rule 3). Returns the last step's nodes, in
+   * the order first reached, paginated (default 100), and every recorded
+   * edge.
+   */
   async traverse(
     ctx: RequestContext,
     startId: string,
@@ -1015,65 +1063,46 @@ export class MemoryStorageProvider implements StorageProvider {
     const includeDeleted = options?.includeDeleted ?? false;
     const collectedEdges = new Map<string, OntologyLink>();
     let totalNodesSeen = 0;
-
-    // Start with the set of current object IDs
-    let currentIds = new Set<string>([startId]);
+    let frontier: Array<{ type: string | undefined; id: string }> = [{ type: undefined, id: startId }];
     let stepNodes = new Map<string, OntologyObject>();
 
     for (const step of path.steps) {
-      if (currentIds.size === 0) break;
-      if (totalNodesSeen >= MAX_TRAVERSAL_NODES) break;
-
-      const nextIds = new Set<string>();
-      stepNodes = new Map<string, OntologyObject>();
-
-      for (const objectId of currentIds) {
-        if (totalNodesSeen >= MAX_TRAVERSAL_NODES) break;
-
-        const links = Array.from(this._links.values()).filter((link) => {
-          if (link._tenantId !== ctx.tenantId) return false;
-          if (link._type !== step.linkType) return false;
-          if (!includeDeleted && link._deletedAt) return false;
-          if (step.direction === 'outbound') return link._fromId === objectId;
-          return link._toId === objectId;
-        });
-
-        for (const link of links) {
+      if (frontier.length === 0) break;
+      const nextNodes = new Map<string, OntologyObject>();
+      for (const { type, id } of frontier) {
+        for (const link of this._links.values()) {
           if (totalNodesSeen >= MAX_TRAVERSAL_NODES) break;
-
-          const targetId = step.direction === 'outbound' ? link._toId : link._fromId;
-          const targetType = step.direction === 'outbound' ? link._toType : link._fromType;
-
-          // Find the target object
-          const targetObj = this._objects.get(`${targetType}:${targetId}`);
-          if (!targetObj || targetObj._tenantId !== ctx.tenantId) continue;
-          if (!includeDeleted && targetObj._deletedAt) continue;
-
-          // Apply step filter if present
-          if (step.filter && !evaluateFilter(targetObj as Record<string, unknown>, step.filter)) {
-            continue;
-          }
-
+          if (link._tenantId !== ctx.tenantId || link._type !== step.linkType) continue;
+          if (!includeDeleted && link._deletedAt) continue;
+          const outbound = step.direction === 'outbound';
+          const srcType = outbound ? link._fromType : link._toType;
+          const srcId = outbound ? link._fromId : link._toId;
+          if (srcId !== id || (type !== undefined && srcType !== type)) continue;
+          // The start object is checked here, by the type its links give it.
+          if (!this._visibleObject(ctx, srcType, srcId, includeDeleted)) continue;
+          const tgtType = outbound ? link._toType : link._fromType;
+          const tgtId = outbound ? link._toId : link._fromId;
+          const target = this._visibleObject(ctx, tgtType, tgtId, includeDeleted);
+          if (!target) continue;
+          if (step.filter && !evaluateFilter(target as Record<string, unknown>, step.filter)) continue;
           collectedEdges.set(`${link._type}:${link._id}`, link);
-          const nodeKey = `${targetType}:${targetId}`;
-          if (!stepNodes.has(nodeKey)) {
-            stepNodes.set(nodeKey, targetObj);
+          const nodeKey = `${tgtType}:${tgtId}`;
+          if (!nextNodes.has(nodeKey)) {
+            nextNodes.set(nodeKey, target);
             totalNodesSeen++;
           }
-          nextIds.add(targetId);
         }
       }
-
-      currentIds = nextIds;
+      stepNodes = nextNodes;
+      frontier = Array.from(nextNodes.values()).map((n) => ({ type: n._type, id: n._id }));
     }
 
     // nodes = only the final step's results; edges = all traversed edges
     const nodes = Array.from(stepNodes.values()).map((n) => clone(n));
     const edges = Array.from(collectedEdges.values()).map((e) => clone(e));
 
-    // Apply pagination
     const offset = options?.offset ?? 0;
-    const limit = options?.limit ?? nodes.length;
+    const limit = options?.limit ?? 100;
     const paginatedNodes = nodes.slice(offset, offset + limit);
 
     return {
