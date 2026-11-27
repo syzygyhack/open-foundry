@@ -36,7 +36,16 @@ import type {
   SearchResult,
   SearchHit,
 } from '@openfoundry/spi';
-import { assertObjectType, assertLinkType, assertFilterFields, systemFilterKey, SchemaGuardError } from '@openfoundry/spi';
+import {
+  assertObjectType,
+  assertLinkType,
+  assertFilterFields,
+  systemFilterKey,
+  SchemaGuardError,
+  encodeLinkCursor,
+  decodeLinkCursor,
+  assertCursorOrOffset,
+} from '@openfoundry/spi';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1074,19 +1083,37 @@ export class MemoryStorageProvider implements StorageProvider {
         this._visibleObject(ctx, link._toType, link._toId, false) !== undefined
       );
     });
-    items.sort((x, y) =>
-      x._createdAt < y._createdAt ? -1 : x._createdAt > y._createdAt ? 1 : x._id < y._id ? -1 : x._id > y._id ? 1 : 0,
-    );
+    const order = (xt: string, xid: string, yt: string, yid: string): number =>
+      xt < yt ? -1 : xt > yt ? 1 : xid < yid ? -1 : xid > yid ? 1 : 0;
+    items.sort((x, y) => order(x._createdAt, x._id, y._createdAt, y._id));
 
     const totalCount = items.length;
-    const offset = options?.offset ?? 0;
     const limit = Math.min(options?.limit ?? 100, 1000);
-    items = items.slice(offset, offset + limit);
+    assertCursorOrOffset(options);
+    let hasNextPage: boolean;
+    if (options?.after !== undefined) {
+      // Keyset: the links after the cursor's position.
+      const after = decodeLinkCursor(options.after);
+      // This provider's cursors carry the link's ISO timestamp.
+      const at = new Date(after.t);
+      if (Number.isNaN(at.getTime()) || at.toISOString() !== after.t) {
+        throw new SchemaGuardError('VALIDATION_ERROR', 'Malformed link cursor');
+      }
+      const rest = items.filter((l) => order(l._createdAt, l._id, after.t, after.id) > 0);
+      items = rest.slice(0, limit);
+      hasNextPage = rest.length > limit;
+    } else {
+      const offset = options?.offset ?? 0;
+      items = items.slice(offset, offset + limit);
+      hasNextPage = offset + limit < totalCount;
+    }
+    const last = items[items.length - 1];
 
     return {
       items: items.map((i) => clone(i)),
       totalCount,
-      hasNextPage: offset + limit < totalCount,
+      hasNextPage,
+      ...(last ? { cursor: encodeLinkCursor({ t: last._createdAt, id: last._id }) } : {}),
     };
   }
 

@@ -50,6 +50,21 @@ are called out under **Breaking changes**.
   upgrade keeps the dependency patched and the images scanning clean rather than
   remediating a reachable flaw.
 
+### Added
+
+- **Cursor paging for `getLinks`.** A `LinkPage` now carries a `cursor` (where
+  the page ends), and `QueryOptions.after` continues from it, in the same
+  order (creation time, then ID), on both storage providers. Unlike an
+  offset, a cursor does not shift when links before it are deleted, and
+  `hasNextPage` is decided by the same read as the page. A cursor is opaque
+  and only valid with the provider that issued it; Postgres's keeps the
+  column's microseconds, which a link's returned `_createdAt` does not. A
+  cursor together with a non-zero offset, a malformed one, or a limit or offset that
+  is not a non-negative safe integer is `VALIDATION_ERROR`.
+  On Postgres, `hasNextPage` now comes from the page read itself (one row
+  more is read) with an offset too: the count is a separate statement, and a
+  link committed between the two made it stale.
+
 ### Changed
 
 - Routine updates: `@apollo/server` 5.5.2, `@grpc/grpc-js` 1.14.7 (override floor
@@ -147,12 +162,13 @@ are called out under **Breaking changes**.
   page like Postgres (oldest first, 100 by default, at most 1000 links). An
   action's `deleteLink` effect now reads every page of links: it read only the
   first, so on Postgres (and now on memory) a match past the first 100 links
-  was missed, and `expect: ALL` left the rest. It pages over the view that
-  includes soft-deleted links, so a soft delete during the scan cannot shift
-  a page, skips those links itself (links to a soft-deleted object remain
-  candidates, as before), and reads on after any full page (an exactly full
-  last page within its 1000-page budget is not an error). A link
-  hard-deleted during the scan can still move a later one between pages.
+  was missed, and `expect: ALL` left the rest. It now pages with `getLinks`
+  cursors (see Added), over the view that includes soft-deleted links, and
+  skips those itself (links to a soft-deleted object remain candidates, as
+  before): a link deleted or created during the scan can no longer move
+  another past it. The API's `getAllLinks` (FHIR and CDM Encounter history)
+  pages the same way; with offsets, a history record purged between two
+  reads could push the current admission out of the result.
 
 - **Filters treat unset fields the same on both providers.** On Postgres,
   `neq` and `not` silently dropped records whose field was unset (SQL compares
@@ -177,18 +193,6 @@ are called out under **Breaking changes**.
   nothing to add takes no lock. Existing rows read the new
   property as its default, or null.
 
-- **The memory provider returns unset properties as Postgres does.** A declared
-  property that was never set now reads back as `null` (or, on objects, its
-  default) instead of being absent, on create and after a schema version adds
-  the property; Postgres, the production store, already did this. Memory links
-  also get the `id` property Postgres fills in. A property named like a system
-  field (`_tenantId`, `_id`, ...) can no longer overwrite it on create: the
-  memory provider let a create in one tenant write the object into another.
-
-- **Hard delete removes the object's links, as the spec requires.** Both
-  storage providers removed the object (and its history) but left every link
-  from or to it, with its properties: traversal from the deleted ID still
-  worked, and a one-to-one or many-to-one link kept the surviving endpoint's
 - **Postgres: catalog lookups use the names the tables were created with.**
   The DDL drops a leading underscore from a type's table name (`_Ward` is
   table `ward`) and PostgreSQL cuts names to 63 bytes, but search's column
@@ -208,6 +212,18 @@ are called out under **Breaking changes**.
   column on Postgres, hidden ones included; it now searches none, as on the
   memory provider.
 
+- **The memory provider returns unset properties as Postgres does.** A declared
+  property that was never set now reads back as `null` (or, on objects, its
+  default) instead of being absent, on create and after a schema version adds
+  the property; Postgres, the production store, already did this. Memory links
+  also get the `id` property Postgres fills in. A property named like a system
+  field (`_tenantId`, `_id`, ...) can no longer overwrite it on create: the
+  memory provider let a create in one tenant write the object into another.
+
+- **Hard delete removes the object's links, as the spec requires.** Both
+  storage providers removed the object (and its history) but left every link
+  from or to it, with its properties: traversal from the deleted ID still
+  worked, and a one-to-one or many-to-one link kept the surviving endpoint's
   slot. Hard delete is meant for data-retention compliance, so the leftover
   links kept exactly the data it should remove. It now removes all of the
   object's links, live and soft-deleted, in the same transaction, and rolling

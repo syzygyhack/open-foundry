@@ -101,6 +101,10 @@ export type {
   ObjectSetStore,
 } from './object-set.js';
 
+// Keyset cursors for getLinks
+export { encodeLinkCursor, decodeLinkCursor, assertCursorOrOffset } from './link-cursor.js';
+export type { LinkCursor } from './link-cursor.js';
+
 // Schema guards shared by storage providers (unknown type / filter field)
 export {
   SchemaGuardError,

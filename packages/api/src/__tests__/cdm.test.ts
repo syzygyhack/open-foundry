@@ -223,11 +223,11 @@ describe('CDM Encounter projection', () => {
     });
     const all = [...Array.from({ length: 100 }, (_, i) => mk(i, true)), mk(100, false)];
     (deps.linkManager.getLinks as ReturnType<typeof vi.fn>).mockImplementation(
-      async (_id: string, _t: string, _d: string, opts: { limit: number; offset: number }) => ({
-        items: all.slice(opts.offset, opts.offset + opts.limit),
-        totalCount: all.length,
-        hasNextPage: opts.offset + opts.limit < all.length,
-      }),
+      async (_id: string, _t: string, _d: string, opts: { limit: number; after?: string }) => {
+        const from = opts.after === undefined ? 0 : Number(opts.after);
+        const items = all.slice(from, from + opts.limit);
+        return { items, totalCount: all.length, hasNextPage: from + opts.limit < all.length, cursor: String(from + items.length) };
+      },
     );
     const router = createCdmRouter({ deps });
     const res = await router({ method: 'GET', path: 'Encounter', query: { patient: 'p-1' }, user: makeUser() });

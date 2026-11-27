@@ -60,35 +60,40 @@ function failResult(actionId: string, errors: ActionError[]): ActionResult {
 }
 
 /**
- * Every live link from offset pages (see ActionExecutor.allLinks for why the
- * pages include soft-deleted links and why a full page is always followed by
- * another read). At most `maxPages` pages of links are read, plus one more
- * read that must come back empty: a scan whose last page is exactly full
- * still ends, and one with more pages than that is an error rather than an
- * endless loop.
+ * Every live link, read page by page with getLinks cursors (see
+ * ActionExecutor.allLinks). A cursor continues after the last link read, so
+ * links deleted behind it cannot move a later one past the scan, and the
+ * provider decides hasNextPage in the same read as the page. At most
+ * `maxPages` pages are read; more is an error rather than an endless loop, as
+ * is a provider that returns a next page without a cursor or ignores `after`
+ * (a page with nothing new).
  * @internal exported for tests
  */
 export async function readLinkPages(
-  fetch: (offset: number, limit: number) => Promise<{ items: OntologyLink[]; hasNextPage: boolean }>,
+  fetch: (after: string | undefined, limit: number) => Promise<{ items: OntologyLink[]; hasNextPage: boolean; cursor?: string }>,
   what: string,
   pageSize = 1000,
   maxPages = 1000,
 ): Promise<OntologyLink[]> {
   const seen = new Set<string>();
   const out: OntologyLink[] = [];
-  for (let pageNo = 0; ; pageNo++) {
-    const page = await fetch(pageNo * pageSize, pageSize);
-    if (pageNo === maxPages) {
-      if (page.items.length === 0) return out;
-      throw new Error(`${what} did not reach its last page after ${maxPages} pages`);
-    }
+  let after: string | undefined;
+  for (let pageNo = 0; pageNo < maxPages; pageNo++) {
+    const page = await fetch(after, pageSize);
+    let fresh = 0;
     for (const link of page.items) {
-      if (link._deletedAt || seen.has(link._id)) continue;
+      if (seen.has(link._id)) continue;
       seen.add(link._id);
-      out.push(link);
+      fresh++;
+      if (!link._deletedAt) out.push(link);
     }
-    if (page.items.length === 0 || (!page.hasNextPage && page.items.length < pageSize)) return out;
+    if (!page.hasNextPage || page.items.length === 0) return out;
+    if (!page.cursor || fresh === 0) {
+      throw new Error(`${what} reports a next page but does not page by cursor`);
+    }
+    after = page.cursor;
   }
+  throw new Error(`${what} did not reach its last page after ${maxPages} pages`);
 }
 
 /**
@@ -895,28 +900,16 @@ export class ActionExecutor {
   }
 
   /**
-   * Every live link of a type in one direction, following hasNextPage.
+   * Every live link of a type in one direction, every page of it.
    *
-   * Pages are read with includeDeleted: in that view (oldest first, then by
-   * ID) a soft delete keeps the row, so it cannot move later links back
-   * across a page boundary. The default view drops a link as soon as it, or
-   * its far endpoint, is soft deleted, which moves every later link back a
-   * place and lets one fall between two pages. Soft-deleted links are then
-   * left out here, so links to a soft-deleted object are still candidates,
-   * as they were before getLinks hid them.
-   *
-   * Offset pages are not a snapshot, though. A link committed during the
-   * scan can sort among links already read (Postgres stamps it with its
-   * transaction's start time) and push one forward: that one is read again
-   * on the next page (links are de-duplicated by ID). A full page is
-   * therefore always followed by another read, even if hasNextPage says no:
-   * on Postgres the count behind hasNextPage and the page itself are separate
-   * statements, and a link pushed forward between them would otherwise be
-   * left on a page nobody reads. What remains is a link hard-deleted during
-   * the scan (directly, or by a hard delete of an endpoint), which moves
-   * later links back, so one can fall between two pages; closing that needs
-   * a snapshot or keyset read from storage. A provider that never reports
-   * the last page is an error rather than an endless loop.
+   * Pages are read with getLinks cursors, which continue after the last link
+   * read: a link deleted or soft-deleted behind the cursor (directly, or with
+   * an endpoint) cannot move a later one between two pages, as it could with
+   * offsets. They include soft-deleted links, which are left out here, so
+   * links to a soft-deleted object are still candidates, as they were before
+   * getLinks hid them by default. A link committed during the scan is read
+   * if it sorts after the cursor (it was not there when the scan began
+   * either way).
    */
   private async allLinks(
     reqCtx: RequestContext,
@@ -925,8 +918,12 @@ export class ActionExecutor {
     direction: 'inbound' | 'outbound',
   ): Promise<OntologyLink[]> {
     return readLinkPages(
-      (offset, limit) =>
-        this.config.storage.getLinks(reqCtx, objectId, linkType, direction, { limit, offset, includeDeleted: true }),
+      (after, limit) =>
+        this.config.storage.getLinks(reqCtx, objectId, linkType, direction, {
+          limit,
+          includeDeleted: true,
+          ...(after !== undefined ? { after } : {}),
+        }),
       `getLinks(${linkType}, ${direction})`,
     );
   }

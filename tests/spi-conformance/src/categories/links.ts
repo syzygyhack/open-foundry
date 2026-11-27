@@ -408,6 +408,95 @@ export function registerLinkTests(name: string, factory: ProviderFactory): void 
 
     // ─── Hard delete of an endpoint (spec §3.3 rule 6) ───
 
+    describe('cursor paging (after / cursor)', () => {
+      async function seed(n: number): Promise<{ ids: string[]; teams: string[] }> {
+        const teams: string[] = [];
+        for (let i = 0; i < n; i++) {
+          const team = await provider.createObject(tenantA, 'CareTeam', { name: `Cursor ${i}` });
+          teams.push(team._id);
+          await provider.createLink(tenantA, 'AssignedTo', patientId1, team._id);
+        }
+        const all = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { limit: 1000 });
+        return { ids: all.items.map((l) => l._id), teams: all.items.map((l) => l._toId) };
+      }
+      const page = (after?: string, limit = 3) =>
+        provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { limit, ...(after ? { after } : {}) });
+
+      it('returns every link once, in getLinks order, and says when it is done', async () => {
+        const { ids } = await seed(7);
+        const seen: string[] = [];
+        const sizes: number[] = [];
+        let after: string | undefined;
+        for (let i = 0; i < 10; i++) {
+          const p = await page(after);
+          seen.push(...p.items.map((l) => l._id));
+          sizes.push(p.items.length);
+          if (!p.hasNextPage) break;
+          expect(p.cursor).toBeDefined();
+          after = p.cursor;
+        }
+        expect(seen).toEqual(ids);
+        expect(sizes).toEqual([3, 3, 1]);
+        // An exactly full last page reports no next page.
+        const full = await page(undefined, 7);
+        expect(full.items).toHaveLength(7);
+        expect(full.hasNextPage).toBe(false);
+        const rest = await page(full.cursor);
+        expect(rest.items).toEqual([]);
+        expect(rest.hasNextPage).toBe(false);
+        expect(rest.cursor).toBeUndefined();
+      });
+
+      it('does not shift when links before the cursor are deleted', async () => {
+        const { ids, teams } = await seed(7);
+        const first = await page();
+        // Soft-delete the first link, and hard-delete the second link's target.
+        await provider.deleteLink(tenantA, 'AssignedTo', ids[0]!);
+        await provider.deleteObject(tenantA, 'CareTeam', teams[1]!, 'hard');
+        const second = await page(first.cursor);
+        expect(second.items.map((l) => l._id)).toEqual(ids.slice(3, 6));
+        // An offset page would have moved two links back.
+        const byOffset = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { limit: 3, offset: 3 });
+        expect(byOffset.items.map((l) => l._id)).toEqual(ids.slice(5, 7));
+      });
+
+      it('pages over soft-deleted links too with includeDeleted', async () => {
+        const { ids } = await seed(4);
+        await provider.deleteLink(tenantA, 'AssignedTo', ids[2]!);
+        const first = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { limit: 2, includeDeleted: true });
+        const second = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', {
+          limit: 2,
+          includeDeleted: true,
+          after: first.cursor,
+        });
+        expect([...first.items, ...second.items].map((l) => l._id)).toEqual(ids);
+        expect(second.items[0]!._deletedAt).toBeTruthy();
+      });
+
+      it('refuses a cursor with an offset, and a malformed cursor', async () => {
+        const { ids } = await seed(2);
+        expect(ids).toHaveLength(2);
+        const first = await page(undefined, 1);
+        await expect(
+          provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { after: first.cursor, offset: 1 }),
+        ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        await expect(page('not-a-cursor')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        // A real cursor with junk appended, and well-formed cursors whose
+        // position is not a valid timestamp for any provider.
+        await expect(page(`${first.cursor}!`)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        const forged = (t: string) => Buffer.from(JSON.stringify({ t, id: ids[0] }), 'utf8').toString('base64url');
+        await expect(page(forged('bogus'))).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        await expect(page(forged('99999999999999999999999'))).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        await expect(page(forged('2026-02-30T00:00:00.000Z'))).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        for (const bad of [{ limit: -1 }, { limit: 1.5 }, { offset: -1 }, { offset: 1e21 }]) {
+          await expect(
+            provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', bad),
+            JSON.stringify(bad),
+          ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+        }
+      });
+    });
+
     describe('hard delete of an endpoint', () => {
       it('removes its outbound and inbound links, live and soft-deleted', async () => {
         const med = await provider.createObject(tenantA, 'Medication', { name: 'Aspirin' });

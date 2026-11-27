@@ -27,12 +27,13 @@ export function toSnakeCase(s: string): string {
  * fills with past records and can leave out the current one. The FHIR and CDM
  * Encounter projections use this to see a patient's whole admission history.
  *
- * Paging follows hasNextPage alone. totalCount is not used to stop, and a page
- * that repeats earlier links does not stop it either: offset pages can shift
- * when links are written between reads, so a repeated page can come before
- * the page that holds the current link. Links are de-duplicated by ID. A walk
- * past maxPages throws rather than truncating silently or looping forever on
- * a provider that never reports the last page.
+ * Pages are read with getLinks cursors: each continues after the last link
+ * read, so links written or deleted between reads cannot shift a link past
+ * the walk (offset pages could, and a page could repeat an earlier one), and
+ * the provider decides hasNextPage in the same read as the page. Links are
+ * de-duplicated by ID. A walk past maxPages, or a provider that reports a
+ * next page without paging by cursor, throws rather than truncating silently
+ * or looping forever.
  */
 export async function getAllLinks(
   linkManager: Pick<LinkManager, 'getLinks'>,
@@ -45,23 +46,28 @@ export async function getAllLinks(
   const pageSize = options.pageSize ?? 100;
   const maxPages = options.maxPages ?? 1000;
   const byId = new Map<string, OntologyLink>();
-  for (let page = 0; ; page++) {
-    if (page === maxPages) {
-      throw new Error(
-        `getAllLinks: ${linkType} links of ${objectId} still report a next page after ${maxPages} pages`,
-      );
-    }
+  let after: string | undefined;
+  for (let page = 0; page < maxPages; page++) {
     const result = await linkManager.getLinks(
       objectId,
       linkType,
       direction,
-      { limit: pageSize, offset: page * pageSize, includeDeleted: options.includeDeleted },
+      { limit: pageSize, includeDeleted: options.includeDeleted, ...(after !== undefined ? { after } : {}) },
       ctx,
     );
-    for (const link of result.items) if (!byId.has(link._id)) byId.set(link._id, link);
-    if (!result.hasNextPage || result.items.length === 0) break;
+    let fresh = 0;
+    for (const link of result.items) {
+      if (byId.has(link._id)) continue;
+      byId.set(link._id, link);
+      fresh++;
+    }
+    if (!result.hasNextPage || result.items.length === 0) return [...byId.values()];
+    if (!result.cursor || fresh === 0) {
+      throw new Error(`getAllLinks: ${linkType} links of ${objectId} report a next page but do not page by cursor`);
+    }
+    after = result.cursor;
   }
-  return [...byId.values()];
+  throw new Error(`getAllLinks: ${linkType} links of ${objectId} still report a next page after ${maxPages} pages`);
 }
 
 /**

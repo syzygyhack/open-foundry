@@ -1382,15 +1382,17 @@ effects:
       expect(result.success).toBe(true);
     });
 
-    it('reads on after a full page even when hasNextPage says it was the last', async () => {
-      // Postgres counts and pages in separate statements: a link committed
-      // between them pushes one past the page while the count said 1000.
-      const { lastLink } = await seedLinks(1000, ward._id);
+    it('does not miss a link when an earlier one is hard-deleted between pages', async () => {
+      // With offset pages the hard delete moved the target back onto page one,
+      // which had already been read.
+      const { wards, lastLink } = await seedLinks(1000, ward._id);
       await expectOnPageTwo(lastLink!);
       const real = storage.getLinks.bind(storage);
+      let calls = 0;
       (storage as unknown as { getLinks: typeof storage.getLinks }).getLinks = async (...args) => {
         const page = await real(...args);
-        return (args[4]?.offset ?? 0) === 0 ? { ...page, hasNextPage: false, totalCount: 1000 } : page;
+        if (++calls === 1) await storage.deleteObject(REQ_CTX, 'Ward', wards[0]!, 'hard');
+        return page;
       };
 
       const yaml = `
@@ -1414,6 +1416,7 @@ effects:
         NHS_SCHEMA,
       );
 
+      expect(calls).toBeGreaterThanOrEqual(2);
       expect(result.errors).toEqual([]);
       expect(result.success).toBe(true);
     });
@@ -1989,26 +1992,39 @@ effects:
 });
 
 describe('readLinkPages', () => {
-  const links = (n: number) =>
-    Array.from({ length: n }, (_, i) => ({ _id: `l${i}` }) as unknown as import('@openfoundry/spi').OntologyLink);
-  // A provider over `all` links whose hasNextPage says no on the page that
-  // ends at `claimLastAt` (a stale count).
-  const pages = (all: ReturnType<typeof links>, claimLastAt = all.length) =>
-    async (offset: number, limit: number) => {
-      const items = all.slice(offset, offset + limit);
-      return { items, hasNextPage: offset + items.length < claimLastAt };
-    };
+  type Link = import('@openfoundry/spi').OntologyLink;
+  const links = (n: number) => Array.from({ length: n }, (_, i) => ({ _id: `l${i}` }) as unknown as Link);
+  // A cursor-paging provider over `all` (the cursor is the next index).
+  const byCursor = (all: Link[]) => async (after: string | undefined, limit: number) => {
+    const from = after === undefined ? 0 : Number(after);
+    const items = all.slice(from, from + limit);
+    return { items, hasNextPage: from + limit < all.length, cursor: items.length ? String(from + items.length) : undefined };
+  };
 
-  it('ends on an exactly full last page within the page budget', async () => {
-    // 3 pages of 2, the last one full: the fourth read comes back empty.
-    await expect(readLinkPages(pages(links(6)), 'scan', 2, 3)).resolves.toHaveLength(6);
+  it('reads every page by cursor, an exactly full last page included', async () => {
+    await expect(readLinkPages(byCursor(links(6)), 'scan', 2, 3)).resolves.toHaveLength(6);
+    await expect(readLinkPages(byCursor(links(5)), 'scan', 2, 3)).resolves.toHaveLength(5);
   });
 
   it('fails when there are more pages than the budget', async () => {
-    await expect(readLinkPages(pages(links(7)), 'scan', 2, 3)).rejects.toThrow(/did not reach its last page after 3 pages/);
+    await expect(readLinkPages(byCursor(links(7)), 'scan', 2, 3)).rejects.toThrow(/did not reach its last page after 3 pages/);
   });
 
-  it('reads past a full page whose hasNextPage is stale', async () => {
-    await expect(readLinkPages(pages(links(5), 2), 'scan', 2, 5)).resolves.toHaveLength(5);
+  it('fails rather than loops on a provider that ignores the cursor', async () => {
+    const ignoring = async (_after: string | undefined, limit: number) => ({
+      items: links(4).slice(0, limit),
+      hasNextPage: true,
+      cursor: 'x',
+    });
+    await expect(readLinkPages(ignoring, 'scan', 2, 100)).rejects.toThrow(/does not page by cursor/);
+    const noCursor = async () => ({ items: links(2), hasNextPage: true });
+    await expect(readLinkPages(noCursor, 'scan', 2, 100)).rejects.toThrow(/does not page by cursor/);
+  });
+
+  it('leaves out soft-deleted links', async () => {
+    const all = links(3);
+    (all[1] as unknown as { _deletedAt: string })._deletedAt = '2026-01-01T00:00:00Z';
+    const got = await readLinkPages(byCursor(all), 'scan', 2, 3);
+    expect(got.map((l) => l._id)).toEqual(['l0', 'l2']);
   });
 });

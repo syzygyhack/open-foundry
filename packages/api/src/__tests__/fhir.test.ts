@@ -454,11 +454,11 @@ describe('FHIR R4 read-only facade', () => {
       // 100 discharged admissions fill the first page; the current one is on page two.
       const all = [...Array.from({ length: 100 }, (_, i) => mk(i, true)), mk(100, false)];
       (deps.linkManager.getLinks as ReturnType<typeof vi.fn>).mockImplementation(
-        async (_id: string, _t: string, _d: string, opts: { limit: number; offset: number }) => ({
-          items: all.slice(opts.offset, opts.offset + opts.limit),
-          totalCount: all.length,
-          hasNextPage: opts.offset + opts.limit < all.length,
-        }),
+        async (_id: string, _t: string, _d: string, opts: { limit: number; after?: string }) => {
+          const from = opts.after === undefined ? 0 : Number(opts.after);
+          const items = all.slice(from, from + opts.limit);
+          return { items, totalCount: all.length, hasNextPage: from + opts.limit < all.length, cursor: String(from + items.length) };
+        },
       );
 
       const router = createFhirRouter({ deps });
@@ -471,7 +471,7 @@ describe('FHIR R4 read-only facade', () => {
       expect(statuses.filter((s) => s === 'in-progress')).toHaveLength(1);
     });
 
-    it('keeps paging past a repeated page to the current admission', async () => {
+    it('pages by cursor, so a link deleted between reads cannot hide the current admission', async () => {
       const deps = createMockDeps();
       const mk = (i: number, current = false) => ({
         _tenantId: 'tenant-1', _type: 'AdmittedTo', _id: `link-${i}`,
@@ -480,36 +480,59 @@ describe('FHIR R4 read-only facade', () => {
         admissionDate: '2025-06-01T09:00:00Z',
         ...(current ? {} : { _deletedAt: '2025-06-02T09:00:00Z' }),
       });
-      const history = Array.from({ length: 100 }, (_, i) => mk(i));
-      // Links written between reads shift the offsets: the second page repeats
-      // the first, and the current admission arrives on the third. totalCount
-      // understates, as a count taken before the writes would.
-      (deps.linkManager.getLinks as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ items: history, totalCount: 100, hasNextPage: true })
-        .mockResolvedValueOnce({ items: history, totalCount: 100, hasNextPage: true })
-        .mockResolvedValueOnce({ items: [mk(100, true)], totalCount: 100, hasNextPage: false });
+      const all = [...Array.from({ length: 100 }, (_, i) => mk(i)), mk(100, true)];
+      const calls: Array<{ after?: string; offset?: number }> = [];
+      (deps.linkManager.getLinks as ReturnType<typeof vi.fn>).mockImplementation(
+        async (_id: string, _t: string, _d: string, opts: { limit: number; after?: string; offset?: number }) => {
+          calls.push({ after: opts.after, offset: opts.offset });
+          // The first history record is purged after the first read: an offset
+          // of 100 would now start past the current admission.
+          if (calls.length === 2) all.shift();
+          // Offsets and cursors both work, as on the real providers.
+          const from = opts.after === undefined ? (opts.offset ?? 0) : all.findIndex((l) => l._id === opts.after) + 1;
+          const items = all.slice(from, from + opts.limit);
+          return { items, totalCount: all.length, hasNextPage: from + opts.limit < all.length, cursor: items.at(-1)?._id };
+        },
+      );
 
       const router = createFhirRouter({ deps });
       const res = await router(fhirGet('Encounter', { patient: 'Patient/p-1' }));
       const entries = (res.body as FhirBundle).entry!;
-      expect(entries).toHaveLength(101);
       expect(entries.filter((e) => (e.resource as FhirEncounter).status === 'in-progress')).toHaveLength(1);
+      expect(calls[1]).toEqual({ after: 'link-99', offset: undefined });
     });
 
     it('fails rather than looping when the provider never reports the last page', async () => {
-      const link = {
-        _tenantId: 'tenant-1', _type: 'AdmittedTo', _id: 'link-1',
-        _fromType: 'Patient', _fromId: 'p-1', _toType: 'Ward', _toId: 'ward-1',
-        _version: 1, _createdAt: '2025-06-01T09:00:00Z', _updatedAt: '2025-06-01T09:00:00Z',
-        admissionDate: '2025-06-01T09:00:00Z',
-      };
-      const getLinks = vi.fn().mockResolvedValue({ items: [link], totalCount: 1, hasNextPage: true });
+      let n = 0;
+      const getLinks = vi.fn().mockImplementation(async () => {
+        const link = {
+          _tenantId: 'tenant-1', _type: 'AdmittedTo', _id: `link-${++n}`,
+          _fromType: 'Patient', _fromId: 'p-1', _toType: 'Ward', _toId: 'ward-1',
+          _version: 1, _createdAt: '2025-06-01T09:00:00Z', _updatedAt: '2025-06-01T09:00:00Z',
+        };
+        return { items: [link], totalCount: 1, hasNextPage: true, cursor: link._id };
+      });
       await expect(
         getAllLinks({ getLinks }, 'p-1', 'AdmittedTo', 'outbound', { includeDeleted: true, maxPages: 5 }, {
           tenantId: 'tenant-1', actorId: 'a',
         } as RequestContext),
       ).rejects.toThrow(/after 5 pages/);
       expect(getLinks).toHaveBeenCalledTimes(5);
+    });
+
+    it('fails rather than looping when the provider ignores the cursor', async () => {
+      const link = {
+        _tenantId: 'tenant-1', _type: 'AdmittedTo', _id: 'link-1',
+        _fromType: 'Patient', _fromId: 'p-1', _toType: 'Ward', _toId: 'ward-1',
+        _version: 1, _createdAt: '2025-06-01T09:00:00Z', _updatedAt: '2025-06-01T09:00:00Z',
+      };
+      const getLinks = vi.fn().mockResolvedValue({ items: [link], totalCount: 1, hasNextPage: true, cursor: 'c' });
+      await expect(
+        getAllLinks({ getLinks }, 'p-1', 'AdmittedTo', 'outbound', { includeDeleted: true, maxPages: 5 }, {
+          tenantId: 'tenant-1', actorId: 'a',
+        } as RequestContext),
+      ).rejects.toThrow(/do not page by cursor/);
+      expect(getLinks).toHaveBeenCalledTimes(2);
     });
 
     it('requires patient parameter', async () => {

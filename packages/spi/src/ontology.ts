@@ -92,6 +92,13 @@ export interface TraversalOptions {
 export interface QueryOptions {
   limit?: number;
   offset?: number;
+  /**
+   * getLinks only: continue after the link a previous page's `cursor` names,
+   * in the same order (creation time, then ID). Unlike an offset, a cursor
+   * does not shift when links before it are deleted. Not combined with a
+   * non-zero offset. Opaque, and only valid with the provider that issued it.
+   */
+  after?: string;
   orderBy?: { field: string; direction: 'asc' | 'desc' }[];
   includeDeleted?: boolean;
   asOfVersion?: number;
@@ -149,7 +156,12 @@ export interface ObjectPage {
 export interface LinkPage {
   items: OntologyLink[];
   totalCount: number;
+  /**
+   * Whether links follow this page, decided by the same read as the page, so
+   * it is exact at that moment (totalCount may come from an earlier one).
+   */
   hasNextPage: boolean;
+  /** Where this page ends (set when it has items): pass it as `after`. */
   cursor?: string;
 }
 

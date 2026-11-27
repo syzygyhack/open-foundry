@@ -18,6 +18,7 @@ import type {
   DateTime,
   LinkTypeDefinition,
 } from '@openfoundry/spi';
+import { SchemaGuardError, encodeLinkCursor, decodeLinkCursor, assertCursorOrOffset } from '@openfoundry/spi';
 
 import { snakeCase, pgIdent } from '../schema/type-mapping.js';
 import { PgTransaction, resolveQueryable, withTransaction } from '../transactions/index.js';
@@ -27,6 +28,9 @@ import type { Queryable } from '../transactions/index.js';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Extra column getLinks selects for a row's cursor position (never a property). */
+const CURSOR_COL = '__of_cursor_us';
 
 
 /**
@@ -450,6 +454,7 @@ export async function getLinks(
   tx?: PgTransaction,
   endpoints?: { fromType: string; toType: string },
 ): Promise<LinkPage> {
+  assertCursorOrOffset(options);
   const q = resolveQueryable(pool, tx);
   const table = linkTableName(linkType, schema);
 
@@ -487,21 +492,55 @@ export async function getLinks(
   // Pagination — PERF-02: enforce maximum limit to prevent DoS
   const MAX_LINK_QUERY_LIMIT = 1000;
   const limit = Math.min(options?.limit ?? 100, MAX_LINK_QUERY_LIMIT);
-  const offset = options?.offset ?? 0;
-  const paginationParams = [...params, limit, offset];
-  const limitParam = `$${params.length + 1}`;
-  const offsetParam = `$${params.length + 2}`;
 
-  const dataSql = `SELECT * FROM ${table} WHERE ${whereClause} ORDER BY "_created_at" ASC, "_id" ASC LIMIT ${limitParam} OFFSET ${offsetParam}`;
-  const dataResult = await q.query(dataSql, paginationParams);
+  // Each row carries its exact position for a cursor: _created_at has
+  // microseconds, and the ISO string a link returns keeps only milliseconds.
+  const select = `SELECT *, (extract(epoch FROM "_created_at") * 1000000)::bigint::text AS "${CURSOR_COL}" FROM ${table}`;
+  const order = `ORDER BY "_created_at" ASC, "_id" ASC`;
+  let rows: Record<string, unknown>[];
+  let hasNextPage: boolean;
+  if (options?.after !== undefined) {
+    // Keyset: the links after the cursor, and one more to tell whether
+    // another page follows (decided by this read, not by the count above).
+    const after = decodeLinkCursor(options.after);
+    // Microseconds since the epoch, within 2^53 so that the interval product
+    // below (computed in double precision) is exact.
+    if (!/^-?\d{1,16}$/.test(after.t) || Math.abs(Number(after.t)) > Number.MAX_SAFE_INTEGER) {
+      throw new SchemaGuardError('VALIDATION_ERROR', 'Malformed link cursor');
+    }
+    const p = [...params, after.t, after.id, limit + 1];
+    const n = params.length;
+    const sql =
+      `${select} WHERE ${whereClause} AND ("_created_at", "_id") > ` +
+      `(TIMESTAMPTZ 'epoch' + $${n + 1}::bigint * INTERVAL '1 microsecond', $${n + 2}) ` +
+      `${order} LIMIT $${n + 3}`;
+    rows = (await q.query(sql, p)).rows as Record<string, unknown>[];
+    hasNextPage = rows.length > limit;
+    rows = rows.slice(0, limit);
+  } else {
+    const offset = options?.offset ?? 0;
+    // One row more than the page, so hasNextPage comes from this read too:
+    // the count above is a separate statement, and a link committed between
+    // the two (sorting before this page's end) would make it stale.
+    const sql = `${select} WHERE ${whereClause} ${order} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    rows = (await q.query(sql, [...params, limit + 1, offset])).rows as Record<string, unknown>[];
+    hasNextPage = rows.length > limit;
+    rows = rows.slice(0, limit);
+  }
 
-  const items = (dataResult.rows as Record<string, unknown>[]).map(
-    (row) => rowToLink(row),
-  );
+  const lastRow = rows[rows.length - 1];
+  const cursor = lastRow
+    ? encodeLinkCursor({ t: String(lastRow[CURSOR_COL]), id: String(lastRow['_id']) })
+    : undefined;
+  const items = rows.map((row) => {
+    const { [CURSOR_COL]: _, ...rest } = row;
+    return rowToLink(rest);
+  });
 
   return {
     items,
     totalCount,
-    hasNextPage: offset + limit < totalCount,
+    hasNextPage,
+    ...(cursor ? { cursor } : {}),
   };
 }
