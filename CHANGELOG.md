@@ -97,6 +97,12 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Filters treat unset fields the same on both providers.** On Postgres,
+  `neq` and `not` silently dropped records whose field was unset (SQL compares
+  NULL as unknown), and `eq null` matched nothing; the memory provider matched
+  them. Postgres now follows the memory provider: `neq 'x'` and `not(eq 'x')`
+  match an unset field, and `eq null` matches exactly the unset ones.
+
 - **Postgres: a property added to an existing type in a later schema version
   gets its column.** Object and link tables were created with `CREATE TABLE IF
   NOT EXISTS` and never altered, so writing a property that a later version

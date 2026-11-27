@@ -47,10 +47,15 @@ function fieldPredicateToSql(pred: FieldPredicate, offset: number): SqlFragment 
   const col = fieldCol(pred.field);
 
   switch (pred.operator) {
+    // Unset and null are the same value, and a comparison with it is false,
+    // except that eq null matches it and neq matches it unless the value is
+    // null: the memory provider's semantics. SQL's `= NULL` is never true and
+    // `!= 'x'` is unknown, not true, for a NULL column.
     case 'eq':
+      if (pred.value === null) return { text: `${col} IS NULL`, params: [] };
       return { text: `${col} = $${offset}`, params: [pred.value] };
     case 'neq':
-      return { text: `${col} != $${offset}`, params: [pred.value] };
+      return { text: `${col} IS DISTINCT FROM $${offset}`, params: [pred.value] };
     case 'gt':
       return { text: `${col} > $${offset}`, params: [pred.value] };
     case 'gte':
@@ -96,7 +101,11 @@ function logicalPredicateToSql(pred: LogicalPredicate, offset: number): SqlFragm
   }
   if (pred.not) {
     const inner = filterToSql(pred.not, offset);
-    return { text: `NOT (${inner.text})`, params: inner.params };
+    // Unknown (a comparison with NULL) counts as false before it is negated,
+    // so not(eq 'x') matches a NULL column, as on the memory provider. Only
+    // here: elsewhere unknown and false already select the same rows, and an
+    // unwrapped predicate keeps its index.
+    return { text: `NOT COALESCE((${inner.text}), FALSE)`, params: inner.params };
   }
   return { text: 'TRUE', params: [] };
 }

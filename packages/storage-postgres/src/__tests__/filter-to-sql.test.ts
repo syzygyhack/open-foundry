@@ -20,8 +20,15 @@ describe('filterToSql', () => {
 
     it('neq', () => {
       const result = filterToSql({ field: 'status', operator: 'neq', value: 'inactive' });
-      expect(result.text).toBe('"status" != $1');
+      // NULL is distinct from 'inactive', so an unset status matches.
+      expect(result.text).toBe('"status" IS DISTINCT FROM $1');
       expect(result.params).toEqual(['inactive']);
+    });
+
+    it('eq null', () => {
+      const result = filterToSql({ field: 'status', operator: 'eq', value: null });
+      expect(result.text).toBe('"status" IS NULL');
+      expect(result.params).toEqual([]);
     });
 
     it('gt', () => {
@@ -130,7 +137,8 @@ describe('filterToSql', () => {
         not: { field: 'deleted', operator: 'eq', value: true },
       };
       const result = filterToSql(filter);
-      expect(result.text).toBe('NOT ("deleted" = $1)');
+      // Unknown counts as false before negation.
+      expect(result.text).toBe('NOT COALESCE(("deleted" = $1), FALSE)');
       expect(result.params).toEqual([true]);
     });
 

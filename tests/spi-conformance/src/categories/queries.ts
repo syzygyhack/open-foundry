@@ -22,6 +22,49 @@ export function registerQueryTests(name: string, factory: ProviderFactory): void
       await provider.createObject(tenantA, 'Patient', { name: 'Eve', age: 28, status: 'pending', email: 'eve@example.com', score: 91.0 });
     }
 
+    // ─── Unset values (null) ───
+
+    describe('filters and unset values', () => {
+      beforeEach(async () => {
+        await seedPatients();
+        // Frank has no status.
+        await provider.createObject(tenantA, 'Patient', { name: 'Frank', age: 50 });
+      });
+
+      const names = (items: Array<Record<string, unknown>>) => items.map((i) => i.name).sort();
+
+      it('neq matches a record whose field is unset', async () => {
+        const page = await provider.queryObjects(tenantA, 'Patient', { field: 'status', operator: 'neq', value: 'inactive' });
+        expect(names(page.items)).toEqual(['Alice', 'Bob', 'Diana', 'Eve', 'Frank']);
+      });
+
+      it('not(eq) matches a record whose field is unset', async () => {
+        const page = await provider.queryObjects(tenantA, 'Patient', {
+          not: { field: 'status', operator: 'eq', value: 'active' },
+        });
+        expect(names(page.items)).toEqual(['Charlie', 'Eve', 'Frank']);
+      });
+
+      it('eq null matches only the record whose field is unset', async () => {
+        const page = await provider.queryObjects(tenantA, 'Patient', { field: 'status', operator: 'eq', value: null });
+        expect(names(page.items)).toEqual(['Frank']);
+      });
+
+      it('eq on a value never matches an unset field', async () => {
+        const page = await provider.queryObjects(tenantA, 'Patient', {
+          or: [{ field: 'status', operator: 'eq', value: 'pending' }, { field: 'status', operator: 'eq', value: 'x' }],
+        });
+        expect(names(page.items)).toEqual(['Eve']);
+      });
+
+      it('not(and) with an unset field negates as if the comparison were false', async () => {
+        const page = await provider.queryObjects(tenantA, 'Patient', {
+          not: { and: [{ field: 'status', operator: 'eq', value: 'active' }, { field: 'age', operator: 'gte', value: 30 }] },
+        });
+        expect(names(page.items)).toEqual(['Bob', 'Charlie', 'Eve', 'Frank']);
+      });
+    });
+
     // ─── Filter - Equality ───
 
     describe('filter: eq', () => {
