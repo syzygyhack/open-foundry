@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PgTransaction, resolveQueryable } from '../transactions/pg-transaction.js';
+import { PgTransaction, resolveQueryable, withTransaction } from '../transactions/pg-transaction.js';
 import type { Pool, PoolClient } from 'pg';
 
 // ── Mock helpers ───────────────────────────────────────────────────
@@ -154,6 +154,16 @@ describe('PgTransaction', () => {
       expect(mockClient.release).toHaveBeenCalledOnce();
     });
 
+    it('a failed ROLLBACK discards the client and finishes the transaction', async () => {
+      const tx = await PgTransaction.begin(mockPool);
+      (mockClient.query as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('connection lost'));
+
+      await expect(tx.rollback()).rejects.toThrow('connection lost');
+      // The session may still be inside the transaction: destroy, do not pool.
+      expect(mockClient.release).toHaveBeenCalledWith(true);
+      expect(tx.isOpen).toBe(false);
+    });
+
     it('throws if transaction already committed', async () => {
       const tx = await PgTransaction.begin(mockPool);
       await tx.commit();
@@ -238,5 +248,39 @@ describe('resolveQueryable()', () => {
 
     const q = resolveQueryable(mockPool, undefined);
     expect(q).toBe(mockPool);
+  });
+});
+
+describe('withTransaction()', () => {
+  const deadlock = () => Object.assign(new Error('deadlock detected'), { code: '40P01' });
+
+  it('reruns its own transaction when it is a deadlock victim', async () => {
+    const pool = createMockPool();
+    const fn = vi.fn().mockRejectedValueOnce(deadlock()).mockResolvedValueOnce('done');
+    await expect(withTransaction(pool, undefined, fn)).resolves.toBe('done');
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(pool.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after three attempts', async () => {
+    const pool = createMockPool();
+    const fn = vi.fn().mockRejectedValue(deadlock());
+    await expect(withTransaction(pool, undefined, fn)).rejects.toMatchObject({ code: '40P01' });
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not rerun on other errors', async () => {
+    const pool = createMockPool();
+    const fn = vi.fn().mockRejectedValue(Object.assign(new Error('unique'), { code: '23505' }));
+    await expect(withTransaction(pool, undefined, fn)).rejects.toMatchObject({ code: '23505' });
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not rerun inside the caller's transaction", async () => {
+    const pool = createMockPool();
+    const tx = await PgTransaction.begin(pool);
+    const fn = vi.fn().mockRejectedValue(deadlock());
+    await expect(withTransaction(pool, tx, fn)).rejects.toMatchObject({ code: '40P01' });
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

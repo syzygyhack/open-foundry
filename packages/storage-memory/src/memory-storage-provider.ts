@@ -129,7 +129,13 @@ class MemoryTransaction implements Transaction {
     | { op: 'createObject'; key: string; value: OntologyObject }
     | { op: 'updateObject'; key: string; prev: OntologyObject; value: OntologyObject }
     | { op: 'deleteObjectSoft'; key: string; prev: OntologyObject; value: OntologyObject }
-    | { op: 'deleteObjectHard'; key: string; prev: OntologyObject }
+    | {
+        op: 'deleteObjectHard';
+        key: string;
+        prev: OntologyObject;
+        history: OntologyObject[] | undefined;
+        links: Array<[string, OntologyLink]>;
+      }
     | { op: 'createLink'; key: string; value: OntologyLink }
     | { op: 'updateLink'; key: string; prev: OntologyLink; value: OntologyLink }
     | { op: 'deleteLink'; key: string; prev: OntologyLink }
@@ -167,8 +173,14 @@ class MemoryTransaction implements Transaction {
       const updated = this._provider._doSoftDeleteObject(this._ctx, type, id);
       this._journal.push({ op: 'deleteObjectSoft', key: `${type}:${id}`, prev: clone(prev), value: updated });
     } else {
-      this._provider._doHardDeleteObject(this._ctx, type, id);
-      this._journal.push({ op: 'deleteObjectHard', key: `${type}:${id}`, prev: clone(prev) });
+      const removed = this._provider._doHardDeleteObject(this._ctx, type, id);
+      this._journal.push({
+        op: 'deleteObjectHard',
+        key: `${type}:${id}`,
+        prev: clone(prev),
+        history: removed.history,
+        links: removed.links,
+      });
     }
   }
 
@@ -219,7 +231,10 @@ class MemoryTransaction implements Transaction {
           this._provider._popVersionHistory(entry.key);
           break;
         case 'deleteObjectHard':
+          // Restore the object, its version history and its links.
           this._provider._putObject(entry.key, entry.prev);
+          this._provider._putVersionHistory(entry.key, entry.history);
+          for (const [key, link] of entry.links) this._provider._putLink(key, link);
           break;
         case 'createLink':
           this._provider._removeLink(entry.key);
@@ -264,6 +279,10 @@ export class MemoryStorageProvider implements StorageProvider {
     this._objects.delete(key);
     this._versionHistory.delete(key);
   }
+  /** @internal */ _putVersionHistory(key: string, history: OntologyObject[] | undefined): void {
+    if (history) this._versionHistory.set(key, history);
+  }
+
   /** @internal */ _putLink(key: string, link: OntologyLink): void {
     this._links.set(key, link);
   }
@@ -406,17 +425,40 @@ export class MemoryStorageProvider implements StorageProvider {
     return updated;
   }
 
-  /** @internal */ _doHardDeleteObject(ctx: RequestContext, type: string, id: string): void {
+  /**
+   * Hard delete (spec §3.3 rule 6): remove the object, its version history,
+   * and every link from or to it, live or soft-deleted. Links are matched on
+   * tenant, endpoint type and ID, so links left by an earlier delete are
+   * removed too even when the object itself is already gone. Returns what was
+   * removed, for transaction rollback.
+   * @internal
+   */
+  _doHardDeleteObject(
+    ctx: RequestContext,
+    type: string,
+    id: string,
+  ): { history: OntologyObject[] | undefined; links: Array<[string, OntologyLink]> } {
     const key = `${type}:${id}`;
     const existing = this._objects.get(key);
     // Tenant isolation: deny access if object belongs to a different tenant
     if (existing && existing._tenantId !== ctx.tenantId) {
       throw new Error(`Object ${type}:${id} not found`);
     }
-    // Idempotent: no-op if object doesn't exist
-    if (!existing) return;
-    this._objects.delete(key);
-    this._versionHistory.delete(key);
+    const links: Array<[string, OntologyLink]> = [];
+    for (const [linkKey, link] of this._links) {
+      if (link._tenantId !== ctx.tenantId) continue;
+      const touches =
+        (link._fromType === type && link._fromId === id) || (link._toType === type && link._toId === id);
+      if (touches) links.push([linkKey, clone(link)]);
+    }
+    for (const [linkKey] of links) this._links.delete(linkKey);
+    const history = this._versionHistory.get(key)?.map((v) => clone(v));
+    // Idempotent: nothing more to do if the object doesn't exist
+    if (existing) {
+      this._objects.delete(key);
+      this._versionHistory.delete(key);
+    }
+    return { history, links };
   }
 
   /** @internal */ _doCreateLink(
@@ -440,6 +482,7 @@ export class MemoryStorageProvider implements StorageProvider {
     const timestamp = now();
     // Resolve fromType/toType from link type definition or default to 'unknown'
     const def = this._getLinkTypeDef(type);
+    if (def) this._enforceEndpoints(ctx, def.fromType, fromId, def.toType, toId);
     // Strip _engineLinkId from user-facing properties
     const { _engineLinkId: _, ...userProps } = properties ?? {};
     const link: OntologyLink = {
@@ -457,6 +500,23 @@ export class MemoryStorageProvider implements StorageProvider {
     };
     this._links.set(`${type}:${id}`, link);
     return link;
+  }
+
+  /**
+   * Both endpoints must exist in this tenant and not be soft-deleted (spec
+   * §3.3 rule 5), as the Postgres provider checks. Messages match its.
+   */
+  private _enforceEndpoints(ctx: RequestContext, fromType: string, fromId: string, toType: string, toId: string): void {
+    const ends: Array<[string, string, string]> = [['source', fromType, fromId], ['target', toType, toId]];
+    for (const [role, endType, endId] of ends) {
+      const obj = this._objects.get(`${endType}:${endId}`);
+      if (!obj || obj._tenantId !== ctx.tenantId) {
+        throw new Error(`Referential integrity: ${role} object ${endType}:${endId} does not exist`);
+      }
+      if (obj._deletedAt) {
+        throw new Error(`Referential integrity: ${role} object ${endType}:${endId} is soft-deleted`);
+      }
+    }
   }
 
   /** @internal */ _doUpdateLink(ctx: RequestContext, type: string, linkId: string, properties: Record<string, unknown>, expectedVersion?: number): OntologyLink {

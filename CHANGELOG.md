@@ -97,6 +97,29 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Hard delete removes the object's links, as the spec requires.** Both
+  storage providers removed the object (and its history) but left every link
+  from or to it, with its properties: traversal from the deleted ID still
+  worked, and a one-to-one or many-to-one link kept the surviving endpoint's
+  slot. Hard delete is meant for data-retention compliance, so the leftover
+  links kept exactly the data it should remove. It now removes all of the
+  object's links, live and soft-deleted, in the same transaction, and rolling
+  that transaction back restores them (and, on the memory provider, the
+  object's version history, which rollback used to lose). On Postgres a link
+  being created to the object at the same moment can no longer slip in between:
+  `createLink` holds a share lock on both endpoints until it commits. That
+  needs the delete to read at READ COMMITTED (the default), so a hard delete
+  inside a caller's transaction at a stricter isolation level is refused with
+  `VALIDATION_ERROR`; outside a transaction it always works. Creating,
+  updating and soft-deleting an object on Postgres now write the row and its
+  history snapshot in one transaction too, so a hard delete can no longer
+  slip between them and leave a history row of the deleted object behind. A
+  write that Postgres aborts as a deadlock victim (or for a serialization
+  failure) in its own transaction is rerun, up to three attempts, and a
+  connection whose `ROLLBACK` fails is discarded rather than pooled. The memory
+  provider now also refuses links to missing, soft-deleted or other tenants'
+  objects, as Postgres did.
+
 - **Graph-mirror writes work on databases that do not preload Apache AGE.**
   Without `shared_preload_libraries = 'age'`, the first `cypher()` call in a
   fresh session fails, so each new pooled connection lost its first mirror

@@ -20,7 +20,7 @@ import type {
 } from '@openfoundry/spi';
 
 import { snakeCase, pgIdent } from '../schema/type-mapping.js';
-import { PgTransaction, resolveQueryable } from '../transactions/index.js';
+import { PgTransaction, resolveQueryable, withTransaction } from '../transactions/index.js';
 import { ageQuery } from '../graph/age-query.js';
 import type { Queryable } from '../transactions/index.js';
 
@@ -173,6 +173,11 @@ async function enforceCardinality(
 
 /**
  * Verify that both endpoints of a link exist and are not soft-deleted.
+ *
+ * FOR SHARE holds both endpoint rows until the link's transaction ends, so a
+ * concurrent hard or soft delete of an endpoint waits for the link to commit
+ * (and then removes it, or leaves it pointing at a soft-deleted object, as a
+ * soft delete does), instead of passing between this check and the INSERT.
  */
 async function enforceReferentialIntegrity(
   q: Queryable,
@@ -187,7 +192,7 @@ async function enforceReferentialIntegrity(
   const toTable = `${pgIdent(schema)}.${pgIdent(snakeCase(toType))}`;
 
   const fromResult = await q.query(
-    `SELECT "_id", "_deleted_at" FROM ${fromTable} WHERE "_tenant_id" = $1 AND "_id" = $2`,
+    `SELECT "_id", "_deleted_at" FROM ${fromTable} WHERE "_tenant_id" = $1 AND "_id" = $2 FOR SHARE`,
     [tenantId, fromId],
   );
   if (fromResult.rows.length === 0) {
@@ -198,7 +203,7 @@ async function enforceReferentialIntegrity(
   }
 
   const toResult = await q.query(
-    `SELECT "_id", "_deleted_at" FROM ${toTable} WHERE "_tenant_id" = $1 AND "_id" = $2`,
+    `SELECT "_id", "_deleted_at" FROM ${toTable} WHERE "_tenant_id" = $1 AND "_id" = $2 FOR SHARE`,
     [tenantId, toId],
   );
   if (toResult.rows.length === 0) {
@@ -234,7 +239,25 @@ export async function createLink(
   schema = 'public',
   tx?: PgTransaction,
 ): Promise<OntologyLink> {
-  const q = resolveQueryable(pool, tx);
+  // One transaction (the caller's, or its own), so the endpoint locks taken by
+  // the referential-integrity check last until the link is written.
+  return withTransaction(pool, tx, (q) =>
+    insertLink(q, ctx, type, fromType, fromId, toType, toId, properties, cardinality, schema),
+  );
+}
+
+async function insertLink(
+  q: Queryable,
+  ctx: RequestContext,
+  type: string,
+  fromType: string,
+  fromId: string,
+  toType: string,
+  toId: string,
+  properties: Record<string, unknown> | undefined,
+  cardinality: LinkTypeDefinition['cardinality'],
+  schema: string,
+): Promise<OntologyLink> {
   // Honour engine-provided ID (UUIDv7) per SPI contract, fall back to genId
   const engineId = properties?._engineLinkId;
   const id = typeof engineId === 'string' ? engineId : genId();

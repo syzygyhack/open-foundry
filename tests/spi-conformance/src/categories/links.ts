@@ -372,6 +372,93 @@ export function registerLinkTests(name: string, factory: ProviderFactory): void 
       });
     });
 
+    // ─── Hard delete of an endpoint (spec §3.3 rule 6) ───
+
+    describe('hard delete of an endpoint', () => {
+      it('removes its outbound and inbound links, live and soft-deleted', async () => {
+        const med = await provider.createObject(tenantA, 'Medication', { name: 'Aspirin' });
+        const out1 = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1, { role: 'primary' });
+        const out2 = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId2);
+        await provider.deleteLink(tenantA, 'AssignedTo', out2._id);
+        // A soft-deleted link to the object being deleted goes too.
+        const gone = await provider.createLink(tenantA, 'AssignedTo', patientId2, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', gone._id);
+        const inbound = await provider.createLink(tenantA, 'Prescribes', teamId1, med._id);
+
+        await provider.deleteObject(tenantA, 'CareTeam', teamId1, 'hard');
+
+        const fromPatient2 = await provider.getLinks(tenantA, patientId2, 'AssignedTo', 'outbound', { includeDeleted: true });
+        expect(fromPatient2.items).toHaveLength(0);
+
+        expect(await provider.getLink(tenantA, 'AssignedTo', out1._id)).toBeNull();
+        expect(await provider.getLink(tenantA, 'Prescribes', inbound._id)).toBeNull();
+        const fromPatient = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', { includeDeleted: true });
+        // Only the soft-deleted link to the surviving team remains.
+        expect(fromPatient.items.map((l) => l._id)).toEqual([out2._id]);
+        const toMed = await provider.getLinks(tenantA, med._id, 'Prescribes', 'inbound', { includeDeleted: true });
+        expect(toMed.items).toHaveLength(0);
+        const fromTeam = await provider.traverse(tenantA, teamId1, {
+          steps: [{ linkType: 'Prescribes', direction: 'outbound' }],
+        });
+        expect(fromTeam.nodes).toHaveLength(0);
+        expect(fromTeam.edges).toHaveLength(0);
+      });
+
+      it('leaves other objects\' links alone', async () => {
+        const kept = await provider.createLink(tenantA, 'AssignedTo', patientId2, teamId2);
+        await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteObject(tenantA, 'Patient', patientId1, 'hard');
+        expect(await provider.getLink(tenantA, 'AssignedTo', kept._id)).not.toBeNull();
+      });
+
+      it('frees the surviving endpoint\'s cardinality slot', async () => {
+        await provider.createLink(tenantA, 'PrimaryDoctor', patientId1, teamId1);
+        await provider.deleteObject(tenantA, 'CareTeam', teamId1, 'hard');
+        // ONE_TO_ONE: before, the dangling link still held patient1's slot.
+        await expect(provider.createLink(tenantA, 'PrimaryDoctor', patientId1, teamId2)).resolves.toMatchObject({
+          _toId: teamId2,
+        });
+      });
+
+      it('is rolled back with its transaction, links and history included', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1, { role: 'primary' });
+        await provider.updateObject(tenantA, 'Patient', patientId1, { age: 40 });
+        const tx = await provider.beginTransaction(tenantA);
+        await tx.deleteObject('Patient', patientId1, 'hard');
+        await tx.rollback();
+
+        expect(await provider.getObject(tenantA, 'Patient', patientId1)).toMatchObject({ age: 40 });
+        expect(await provider.getLink(tenantA, 'AssignedTo', link._id)).toMatchObject({ role: 'primary' });
+        expect(await provider.getObjectAtVersion(tenantA, 'Patient', patientId1, 1)).toMatchObject({ name: 'Patient1' });
+      });
+
+      it('in a committed transaction removes the links', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        const tx = await provider.beginTransaction(tenantA);
+        await tx.deleteObject('Patient', patientId1, 'hard');
+        await tx.commit();
+        expect(await provider.getLink(tenantA, 'AssignedTo', link._id)).toBeNull();
+      });
+    });
+
+    describe('endpoints must exist (spec §3.3 rule 5)', () => {
+      it('rejects a link to an object that does not exist', async () => {
+        await expect(provider.createLink(tenantA, 'AssignedTo', patientId1, 'no-such-team')).rejects.toThrow(
+          /does not exist/,
+        );
+      });
+
+      it('rejects a link from a soft-deleted object', async () => {
+        await provider.deleteObject(tenantA, 'Patient', patientId1, 'soft');
+        await expect(provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1)).rejects.toThrow(/soft-deleted/);
+      });
+
+      it('rejects a link to another tenant\'s object', async () => {
+        const other = await provider.createObject(tenantB, 'CareTeam', { name: 'Elsewhere' });
+        await expect(provider.createLink(tenantA, 'AssignedTo', patientId1, other._id)).rejects.toThrow(/does not exist/);
+      });
+    });
+
     // ─── Referential Integrity ───
 
     describe('referential integrity', () => {

@@ -20,7 +20,7 @@ import type {
 import { snakeCase, pgIdent, fieldCol } from '../schema/type-mapping.js';
 
 import { filterToSql } from './filter-to-sql.js';
-import { PgTransaction, resolveQueryable } from '../transactions/index.js';
+import { PgTransaction, resolveQueryable, withTransaction } from '../transactions/index.js';
 import { ageQuery } from '../graph/age-query.js';
 
 // ---------------------------------------------------------------------------
@@ -126,41 +126,45 @@ export async function createObject(
   schema = 'public',
   tx?: PgTransaction,
 ): Promise<OntologyObject> {
-  const q = resolveQueryable(pool, tx);
-  const id = genId();
-  const timestamp = now();
+  // The row, its history snapshot and its graph mirror in one transaction
+  // (the caller's, or its own): a hard delete waiting on the row lock then
+  // sees the history row, instead of one landing after it.
+  return withTransaction(pool, tx, async (q) => {
+    const id = genId();
+    const timestamp = now();
 
-  // Build column names and values for user properties
-  const propEntries = Object.entries(properties);
-  const systemCols = ['"_tenant_id"', '"_id"', '"_type"', '"_version"', '"_created_at"', '"_updated_at"'];
-  const systemVals = [ctx.tenantId, id, type, 1, timestamp, timestamp];
+    // Build column names and values for user properties
+    const propEntries = Object.entries(properties);
+    const systemCols = ['"_tenant_id"', '"_id"', '"_type"', '"_version"', '"_created_at"', '"_updated_at"'];
+    const systemVals = [ctx.tenantId, id, type, 1, timestamp, timestamp];
 
-  const propCols = propEntries.map(([k]) => pgIdent(snakeCase(k)));
-  // Serialize objects/arrays as JSON strings for JSONB columns —
-  // the pg driver does not auto-serialize non-primitive values.
-  // Dates must pass through for TIMESTAMPTZ columns.
-  const propVals = propEntries.map(([, v]) =>
-    v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v,
-  );
+    const propCols = propEntries.map(([k]) => pgIdent(snakeCase(k)));
+    // Serialize objects/arrays as JSON strings for JSONB columns —
+    // the pg driver does not auto-serialize non-primitive values.
+    // Dates must pass through for TIMESTAMPTZ columns.
+    const propVals = propEntries.map(([, v]) =>
+      v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v,
+    );
 
-  const allCols = [...systemCols, ...propCols];
-  const allVals = [...systemVals, ...propVals];
-  const placeholders = allVals.map((_, i) => `$${i + 1}`);
+    const allCols = [...systemCols, ...propCols];
+    const allVals = [...systemVals, ...propVals];
+    const placeholders = allVals.map((_, i) => `$${i + 1}`);
 
-  const table = tableName(type, schema);
-  const insertSql = `INSERT INTO ${table} (${allCols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`;
+    const table = tableName(type, schema);
+    const insertSql = `INSERT INTO ${table} (${allCols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`;
 
-  const result = await q.query(insertSql, allVals);
-  const row = result.rows[0] as Record<string, unknown>;
-  const obj = rowToObject(row);
+    const result = await q.query(insertSql, allVals);
+    const row = result.rows[0] as Record<string, unknown>;
+    const obj = rowToObject(row);
 
-  // Insert history snapshot
-  await insertHistory(q, type, row, schema);
+    // Insert history snapshot
+    await insertHistory(q, type, row, schema);
 
-  // Create AGE vertex
-  await createAgeVertex(q, type, ctx.tenantId, id);
+    // Create AGE vertex
+    await createAgeVertex(q, type, ctx.tenantId, id);
 
-  return obj;
+    return obj;
+  });
 }
 
 /**
@@ -201,71 +205,75 @@ export async function updateObject(
   tx?: PgTransaction,
   expectedVersion?: number,
 ): Promise<OntologyObject> {
-  const q = resolveQueryable(pool, tx);
-  const table = tableName(type, schema);
-  const timestamp = now();
+  // The row, its history snapshot and its graph mirror in one transaction
+  // (the caller's, or its own): a hard delete waiting on the row lock then
+  // sees the history row, instead of one landing after it.
+  return withTransaction(pool, tx, async (q) => {
+    const table = tableName(type, schema);
+    const timestamp = now();
 
-  // Build SET clause for user properties
-  const propEntries = Object.entries(properties);
-  const setClauses: string[] = [
-    `"_version" = "_version" + 1`,
-    `"_updated_at" = $1`,
-  ];
-  const params: unknown[] = [timestamp];
-  let paramIdx = 2;
+    // Build SET clause for user properties
+    const propEntries = Object.entries(properties);
+    const setClauses: string[] = [
+      `"_version" = "_version" + 1`,
+      `"_updated_at" = $1`,
+    ];
+    const params: unknown[] = [timestamp];
+    let paramIdx = 2;
 
-  for (const [key, value] of propEntries) {
-    setClauses.push(`${pgIdent(snakeCase(key))} = $${paramIdx}`);
-    // Serialize objects/arrays as JSON strings for JSONB columns
-    params.push(value !== null && typeof value === 'object' && !(value instanceof Date) ? JSON.stringify(value) : value);
-    paramIdx++;
-  }
+    for (const [key, value] of propEntries) {
+      setClauses.push(`${pgIdent(snakeCase(key))} = $${paramIdx}`);
+      // Serialize objects/arrays as JSON strings for JSONB columns
+      params.push(value !== null && typeof value === 'object' && !(value instanceof Date) ? JSON.stringify(value) : value);
+      paramIdx++;
+    }
 
-  // WHERE clause params
-  params.push(ctx.tenantId); // $paramIdx
-  const tenantParam = paramIdx++;
-  params.push(id); // $paramIdx
-  const idParam = paramIdx++;
+    // WHERE clause params
+    params.push(ctx.tenantId); // $paramIdx
+    const tenantParam = paramIdx++;
+    params.push(id); // $paramIdx
+    const idParam = paramIdx++;
 
-  let whereClause = `"_tenant_id" = $${tenantParam} AND "_id" = $${idParam} AND "_deleted_at" IS NULL`;
-  if (expectedVersion !== undefined) {
-    params.push(expectedVersion);
-    whereClause += ` AND "_version" = $${paramIdx}`;
-  }
-
-  const sql = `UPDATE ${table} SET ${setClauses.join(', ')} WHERE ${whereClause} RETURNING *`;
-
-  const result = await q.query(sql, params);
-  if (result.rows.length === 0) {
+    let whereClause = `"_tenant_id" = $${tenantParam} AND "_id" = $${idParam} AND "_deleted_at" IS NULL`;
     if (expectedVersion !== undefined) {
-      // Follow-up SELECT to distinguish not-found vs version-mismatch
-      const check = await q.query(
-        `SELECT "_version" FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2 AND "_deleted_at" IS NULL`,
-        [ctx.tenantId, id],
-      );
-      if (check.rows.length === 0) {
-        const err = new Error(`Object ${type}:${id} not found or deleted`) as Error & { code: string };
+      params.push(expectedVersion);
+      whereClause += ` AND "_version" = $${paramIdx}`;
+    }
+
+    const sql = `UPDATE ${table} SET ${setClauses.join(', ')} WHERE ${whereClause} RETURNING *`;
+
+    const result = await q.query(sql, params);
+    if (result.rows.length === 0) {
+      if (expectedVersion !== undefined) {
+        // Follow-up SELECT to distinguish not-found vs version-mismatch
+        const check = await q.query(
+          `SELECT "_version" FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2 AND "_deleted_at" IS NULL`,
+          [ctx.tenantId, id],
+        );
+        if (check.rows.length === 0) {
+          const err = new Error(`Object ${type}:${id} not found or deleted`) as Error & { code: string };
+          err.code = 'VERSION_CONFLICT';
+          throw err;
+        }
+        const currentVersion = (check.rows[0] as Record<string, unknown>)['_version'];
+        const err = new Error(`Object ${type}:${id} version mismatch (expected ${expectedVersion}, current ${currentVersion})`) as Error & { code: string };
         err.code = 'VERSION_CONFLICT';
         throw err;
       }
-      const currentVersion = (check.rows[0] as Record<string, unknown>)['_version'];
-      const err = new Error(`Object ${type}:${id} version mismatch (expected ${expectedVersion}, current ${currentVersion})`) as Error & { code: string };
-      err.code = 'VERSION_CONFLICT';
-      throw err;
+      throw new Error(`Object ${type}:${id} not found or is deleted`);
     }
-    throw new Error(`Object ${type}:${id} not found or is deleted`);
-  }
 
-  const row = result.rows[0] as Record<string, unknown>;
-  const obj = rowToObject(row);
+    const row = result.rows[0] as Record<string, unknown>;
+    const obj = rowToObject(row);
 
-  // Insert history snapshot
-  await insertHistory(q, type, row, schema);
+    // Insert history snapshot
+    await insertHistory(q, type, row, schema);
 
-  // Update AGE vertex
-  await updateAgeVertex(q, type, ctx.tenantId, id);
+    // Update AGE vertex
+    await updateAgeVertex(q, type, ctx.tenantId, id);
 
-  return obj;
+    return obj;
+  });
 }
 
 /**
@@ -279,23 +287,39 @@ export async function softDeleteObject(
   schema = 'public',
   tx?: PgTransaction,
 ): Promise<void> {
-  const q = resolveQueryable(pool, tx);
-  const table = tableName(type, schema);
-  const timestamp = now();
+  // The row, its history snapshot and its graph mirror in one transaction
+  // (the caller's, or its own): a hard delete waiting on the row lock then
+  // sees the history row, instead of one landing after it.
+  return withTransaction(pool, tx, async (q) => {
+    const table = tableName(type, schema);
+    const timestamp = now();
 
-  const sql = `UPDATE ${table} SET "_deleted_at" = $1, "_version" = "_version" + 1, "_updated_at" = $1 WHERE "_tenant_id" = $2 AND "_id" = $3 AND "_deleted_at" IS NULL RETURNING *`;
+    const sql = `UPDATE ${table} SET "_deleted_at" = $1, "_version" = "_version" + 1, "_updated_at" = $1 WHERE "_tenant_id" = $2 AND "_id" = $3 AND "_deleted_at" IS NULL RETURNING *`;
 
-  const result = await q.query(sql, [timestamp, ctx.tenantId, id]);
-  if (result.rows.length === 0) {
-    throw new Error(`Object ${type}:${id} not found or already deleted`);
-  }
+    const result = await q.query(sql, [timestamp, ctx.tenantId, id]);
+    if (result.rows.length === 0) {
+      throw new Error(`Object ${type}:${id} not found or already deleted`);
+    }
 
-  // Insert history snapshot for the soft-delete event
-  await insertHistory(q, type, result.rows[0] as Record<string, unknown>, schema);
+    // Insert history snapshot for the soft-delete event
+    await insertHistory(q, type, result.rows[0] as Record<string, unknown>, schema);
+  });
 }
 
 /**
- * Hard-delete: DELETE from type table, history, and AGE vertex + edges.
+ * Hard delete (spec §3.3 rule 6): the object, its history, every link from or
+ * to it (live or soft-deleted, in every link table of the data schema), and its
+ * AGE vertex with its edges, in one transaction (the caller's, or its own).
+ *
+ * The object row is locked first. createLink takes a share lock on both
+ * endpoints for its whole transaction, so a link being created to this object
+ * either commits before the delete proceeds (and is then removed with the
+ * others: each statement here takes a fresh snapshot, at READ COMMITTED) or
+ * waits and then finds the endpoint gone. In a caller's transaction above
+ * READ COMMITTED the snapshot is older than the lock, so that is refused. Links are matched on
+ * tenant, endpoint type and ID, in tables found by their system columns rather
+ * than from the current schema, so links of link types an older schema
+ * version declared, and links an earlier delete left behind, go too.
  */
 export async function hardDeleteObject(
   pool: Pool,
@@ -305,26 +329,63 @@ export async function hardDeleteObject(
   schema = 'public',
   tx?: PgTransaction,
 ): Promise<void> {
-  const q = resolveQueryable(pool, tx);
   const table = tableName(type, schema);
   const historyTable = historyTableName(type, schema);
 
-  // Delete from history table first (no FK, but logical ordering)
-  await q.query(
-    `DELETE FROM ${historyTable} WHERE "_tenant_id" = $1 AND "_id" = $2`,
-    [ctx.tenantId, id],
-  );
-
-  // Delete from main table — idempotent (no-throw if missing, per SPI contract)
-  const result = await q.query(
-    `DELETE FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2`,
-    [ctx.tenantId, id],
-  );
-
-  // If object existed, also clean up AGE vertex (and all connected edges)
-  if (result.rowCount && result.rowCount > 0) {
-    await deleteAgeVertex(q, type, ctx.tenantId, id);
+  if (tx) {
+    // Above READ COMMITTED, the caller's snapshot can predate a link committed
+    // while this waited for the object's row lock (createLink holds a share
+    // lock on it until it commits), and the link would survive its endpoint.
+    // Its own transaction (no tx) is always READ COMMITTED.
+    const level = await tx.client.query<{ transaction_isolation: string }>('SHOW transaction_isolation');
+    const isolation = level.rows[0]?.transaction_isolation;
+    if (isolation !== 'read committed') {
+      throw Object.assign(
+        new Error(
+          `Hard delete of ${type}:${id} needs a READ COMMITTED transaction (this one is ${isolation}); ` +
+            'run it outside the transaction or at READ COMMITTED',
+        ),
+        { code: 'VALIDATION_ERROR' },
+      );
+    }
   }
+
+  await withTransaction(pool, tx, async (q) => {
+    await q.query(`SELECT 1 FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2 FOR UPDATE`, [
+      ctx.tenantId,
+      id,
+    ]);
+
+    const linkTables = await q.query<{ name: string }>(
+      `SELECT c.relname AS name FROM pg_class c
+        WHERE c.relnamespace = to_regnamespace($1)
+          AND c.relkind IN ('r', 'p')
+          AND (SELECT count(*) FROM pg_attribute a
+                WHERE a.attrelid = c.oid AND NOT a.attisdropped
+                  AND a.attname IN ('_tenant_id', '_from_type', '_from_id', '_to_type', '_to_id')) = 5
+        ORDER BY c.relname`,
+      [pgIdent(schema)],
+    );
+    for (const { name } of linkTables.rows) {
+      await q.query(
+        `DELETE FROM ${pgIdent(schema)}."${name.replace(/"/g, '""')}"
+          WHERE "_tenant_id" = $1
+            AND (("_from_type" = $2 AND "_from_id" = $3) OR ("_to_type" = $2 AND "_to_id" = $3))`,
+        [ctx.tenantId, type, id],
+      );
+    }
+
+    // Delete from history table first (no FK, but logical ordering)
+    await q.query(`DELETE FROM ${historyTable} WHERE "_tenant_id" = $1 AND "_id" = $2`, [ctx.tenantId, id]);
+
+    // Delete from main table — idempotent (no-throw if missing, per SPI contract)
+    const result = await q.query(`DELETE FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2`, [ctx.tenantId, id]);
+
+    // If object existed, also clean up AGE vertex (and all connected edges)
+    if (result.rowCount && result.rowCount > 0) {
+      await deleteAgeVertex(q, type, ctx.tenantId, id);
+    }
+  });
 }
 
 /**

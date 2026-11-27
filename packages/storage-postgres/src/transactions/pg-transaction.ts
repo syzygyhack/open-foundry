@@ -75,17 +75,25 @@ export class PgTransaction {
     throw error;
   }
 
-  /** Rollback and release the client back to the pool. */
+  /**
+   * Rollback and release the client back to the pool. The transaction is
+   * finished either way. If ROLLBACK itself fails, the session's state is
+   * unknown (it may still be in the transaction), so the client is discarded
+   * rather than returned to the pool, and the error is thrown.
+   */
   async rollback(): Promise<void> {
     // After a failed commit there is nothing left to roll back.
     if (this._failed) return;
     this.assertOpen();
+    let error: unknown;
     try {
       await this._client.query('ROLLBACK');
-      this._rolledBack = true;
-    } finally {
-      this._client.release();
+    } catch (err) {
+      error = err;
     }
+    this._rolledBack = true;
+    this._client.release(error !== undefined);
+    if (error !== undefined) throw error;
   }
 
   get isOpen(): boolean {
@@ -111,4 +119,42 @@ export type Queryable = Pool | PoolClient;
  */
 export function resolveQueryable(pool: Pool, tx?: PgTransaction): Queryable {
   return tx ? tx.client : pool;
+}
+
+/** Deadlock and serialization failure: the transaction can simply be rerun. */
+const RERUNNABLE = new Set(['40P01', '40001']);
+const MAX_ATTEMPTS = 3;
+
+/**
+ * Run fn in a transaction: the caller's, or else one of its own that commits
+ * when fn resolves and rolls back when it throws. For operations whose
+ * statements must be atomic (and whose row locks must last) even when called
+ * outside a transaction.
+ *
+ * Its own transaction is rerun, up to three attempts in all, when Postgres
+ * aborts it as a deadlock victim or for a serialization failure: row locks
+ * (createLink's on both endpoints, for one) can meet a concurrent transaction
+ * locking the same rows in the other order, and the victim has done nothing
+ * that a rerun would duplicate. In a caller's transaction the error is the
+ * caller's to handle: only the whole transaction can be rerun.
+ */
+export async function withTransaction<T>(
+  pool: Pool,
+  tx: PgTransaction | undefined,
+  fn: (q: PoolClient) => Promise<T>,
+): Promise<T> {
+  if (tx) return fn(tx.client);
+  for (let attempt = 1; ; attempt++) {
+    const own = await PgTransaction.begin(pool);
+    try {
+      const result = await fn(own.client);
+      await own.commit();
+      return result;
+    } catch (err) {
+      if (own.isOpen) await own.rollback().catch(() => undefined);
+      const code = (err as { code?: unknown } | null)?.code;
+      if (attempt < MAX_ATTEMPTS && typeof code === 'string' && RERUNNABLE.has(code)) continue;
+      throw err;
+    }
+  }
 }
