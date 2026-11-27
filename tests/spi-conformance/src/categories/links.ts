@@ -149,6 +149,73 @@ export function registerLinkTests(name: string, factory: ProviderFactory): void 
           provider.deleteLink(tenantB, 'AssignedTo', link._id),
         ).rejects.toThrow();
       });
+
+      // Deletion is a soft delete: the link stays readable on request so that
+      // history projections (discharged admissions as finished FHIR/CDM
+      // Encounters, GraphQL @link(history) fields) work on every provider.
+
+      it('deleted link is returned by getLinks with includeDeleted', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+        const page = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', {
+          includeDeleted: true,
+        });
+        expect(page.items).toHaveLength(1);
+        expect(page.totalCount).toBe(1);
+        expect(page.items[0]!._id).toBe(link._id);
+        expect(page.items[0]!._deletedAt).toBeDefined();
+        expect(page.items[0]!._version).toBe(link._version + 1);
+      });
+
+      it('deleted link is traversed with includeDeleted', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+        const path = { steps: [{ linkType: 'AssignedTo', direction: 'outbound' as const }] };
+        const hidden = await provider.traverse(tenantA, patientId1, path);
+        expect(hidden.edges).toHaveLength(0);
+        const shown = await provider.traverse(tenantA, patientId1, path, { includeDeleted: true });
+        expect(shown.edges.map((e) => e._id)).toEqual([link._id]);
+        expect(shown.nodes.map((n) => n._id)).toEqual([teamId1]);
+      });
+
+      it('deleted link stays hidden from another tenant with includeDeleted', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+        const page = await provider.getLinks(tenantB, patientId1, 'AssignedTo', 'outbound', {
+          includeDeleted: true,
+        });
+        expect(page.items).toHaveLength(0);
+      });
+
+      it('deleting an already-deleted link throws', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+        await expect(
+          provider.deleteLink(tenantA, 'AssignedTo', link._id),
+        ).rejects.toThrow();
+      });
+
+      it('creating a link with the ID of a deleted link throws', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+        await expect(
+          provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1, { _engineLinkId: link._id }),
+        ).rejects.toThrow();
+        const history = await provider.getLinks(tenantA, patientId1, 'AssignedTo', 'outbound', {
+          includeDeleted: true,
+        });
+        expect(history.items.map((l) => [l._id, l._deletedAt !== undefined && l._deletedAt !== null])).toEqual([
+          [link._id, true],
+        ]);
+      });
+
+      it('updating a deleted link throws', async () => {
+        const link = await provider.createLink(tenantA, 'AssignedTo', patientId1, teamId1);
+        await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+        await expect(
+          provider.updateLink(tenantA, 'AssignedTo', link._id, { role: 'lead' }),
+        ).rejects.toThrow();
+      });
     });
 
     // ─── Get Links Direction ───

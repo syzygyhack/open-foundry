@@ -430,6 +430,13 @@ export class MemoryStorageProvider implements StorageProvider {
     // Honour engine-provided ID (UUIDv7) per SPI contract, fall back to genId
     const engineId = properties?._engineLinkId;
     const id = typeof engineId === 'string' ? engineId : genId();
+    // Links are keyed by type and ID, not tenant, so writing over an existing
+    // key would replace another record: a deleted link's history, or another
+    // tenant's link. Postgres rejects a reused ID within a tenant (primary key
+    // on tenant and ID); this also rejects it across tenants.
+    if (this._links.has(`${type}:${id}`)) {
+      throw new Error(`Link ${type}:${id} already exists`);
+    }
     const timestamp = now();
     // Resolve fromType/toType from link type definition or default to 'unknown'
     const def = this._getLinkTypeDef(type);
@@ -455,7 +462,8 @@ export class MemoryStorageProvider implements StorageProvider {
   /** @internal */ _doUpdateLink(ctx: RequestContext, type: string, linkId: string, properties: Record<string, unknown>, expectedVersion?: number): OntologyLink {
     const key = `${type}:${linkId}`;
     const existing = this._links.get(key);
-    if (!existing || existing._tenantId !== ctx.tenantId) {
+    // A soft-deleted link is history, not a live record: reject, as Postgres does.
+    if (!existing || existing._tenantId !== ctx.tenantId || existing._deletedAt) {
       throw new Error(`Link ${type}:${linkId} not found`);
     }
     if (expectedVersion !== undefined && existing._version !== expectedVersion) {
@@ -481,17 +489,25 @@ export class MemoryStorageProvider implements StorageProvider {
     return updated;
   }
 
-  // TODO: Memory provider hard-deletes links (removes from map) while Postgres
-  // provider soft-deletes (sets _deleted_at). This means traverse() with
-  // includeDeleted:true will find soft-deleted links in Postgres but not in
-  // memory. Align by implementing soft-delete semantics here if needed.
-  /** @internal */ _doDeleteLink(ctx: RequestContext, type: string, linkId: string): void {
+  /**
+   * Soft-delete a link: stamp _deletedAt and bump the version, as the Postgres
+   * provider does. Default reads hide it; includeDeleted reads (link history,
+   * e.g. discharged admissions) still return it.
+   * @internal
+   */
+  _doDeleteLink(ctx: RequestContext, type: string, linkId: string): void {
     const key = `${type}:${linkId}`;
     const existing = this._links.get(key);
-    if (!existing || existing._tenantId !== ctx.tenantId) {
-      throw new Error(`Link ${type}:${linkId} not found`);
+    if (!existing || existing._tenantId !== ctx.tenantId || existing._deletedAt) {
+      throw new Error(`Link ${type}:${linkId} not found or already deleted`);
     }
-    this._links.delete(key);
+    const timestamp = now();
+    this._links.set(key, {
+      ...existing,
+      _version: existing._version + 1,
+      _updatedAt: timestamp,
+      _deletedAt: timestamp,
+    });
   }
 
   // ─── Schema ───

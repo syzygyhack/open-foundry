@@ -18,7 +18,7 @@ import type { FilterExpression, FieldPredicate } from '@openfoundry/spi';
 import { DataPurpose } from '@openfoundry/spi';
 import type { ApiDependencies, AuthenticatedUserInfo } from '../graphql/types.js';
 import { logger } from '../logger.js';
-import { toSnakeCase } from '../utils.js';
+import { getAllLinks, toSnakeCase } from '../utils.js';
 import { NHS_ACUTE_CDM_PROFILE } from './profile.js';
 import { projectToCdm, findMappingBySourceType } from './mappers.js';
 import type { CdmRecord } from './types.js';
@@ -395,16 +395,17 @@ export async function handleEncounterSearch(
 
     const ctx = ctxFor(user);
     // includeDeleted so discharged admissions (soft-deleted AdmittedTo links)
-    // are returned and mapped to status=finished. (Postgres soft-deletes links;
-    // the memory provider hard-deletes, so finished encounters are only
-    // recoverable on the Postgres backend.)
-    const linkPage = await deps.linkManager.getLinks(
-      patientId, 'AdmittedTo', 'outbound', { limit: QUERY_LIMIT, offset: 0, includeDeleted: true }, ctx,
+    // are returned and mapped to status=finished. Both storage providers
+    // soft-delete links.
+    // All pages: history comes oldest first, so one page of past admissions
+    // could otherwise push out the current one.
+    const admissions = await getAllLinks(
+      deps.linkManager, patientId, 'AdmittedTo', 'outbound', { includeDeleted: true, pageSize: QUERY_LIMIT }, ctx,
     );
 
     // Flatten links to object shape for the profile-driven projection
     // (same approach as the FHIR Encounter path).
-    const encounterObjects = linkPage.items.map(link => ({
+    const encounterObjects = admissions.map(link => ({
       _id: link._id,
       _version: link._version,
       _updatedAt: link._updatedAt,

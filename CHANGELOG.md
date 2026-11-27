@@ -80,6 +80,27 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Discharged admissions no longer vanish on the in-memory store.** The memory
+  storage provider hard-deleted links while the Postgres provider soft-deletes
+  them. Link history therefore came back empty whenever the gateway ran without
+  `POSTGRES_URL`, and in every test built on the memory provider. That covers
+  FHIR and CDM Encounters for discharged admissions, GraphQL
+  `@link(history: true)` fields such as `Patient.admissions`, and
+  `includeDeleted` traversals.
+
+  The memory provider now soft-deletes as Postgres does: it stamps `_deletedAt`
+  and bumps the version, and rejects updating or re-deleting a deleted link. It
+  also rejects a link ID that is already in use. Before, a reused ID silently
+  replaced the existing record, including another tenant's link.
+
+  The FHIR and CDM Encounter projections now read every page of a patient's
+  admissions. History comes oldest first, so a full first page could leave out
+  the current admission. Paging follows `hasNextPage` and de-duplicates by ID,
+  so pages that shift between reads cannot cut it short. Postgres pages links
+  by creation time and then ID, so links created in the same instant cannot
+  shift between pages. The SPI conformance suite gains the cases that would
+  have caught this.
+
 - **Traces now reach the collector.** Every deployment pointed the services at
   the collector's gRPC port (4317), while the services export with the OTLP/HTTP
   exporter. HTTP/1.1 to a gRPC listener gets an HTTP/2 frame back, so every export

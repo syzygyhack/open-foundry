@@ -248,6 +248,12 @@ describe('Section 7.1: Patient Lifecycle', () => {
       const linksToWardA = allAdmittedLinks.items.filter(l => l._toId === wardAId);
       expect(linksToWardA.length).toBe(0);
 
+      // ...but the Ward-A admission remains as history (soft-deleted)
+      const history = await storage.getLinks(reqCtx, patientId, 'AdmittedTo', 'outbound', { includeDeleted: true });
+      const wardAHistory = history.items.filter(l => l._toId === wardAId);
+      expect(wardAHistory.length).toBe(1);
+      expect(wardAHistory[0]!._deletedAt).toBeDefined();
+
       // Patient still has status ACTIVE after transfer
       const afterTransfer = await storage.getObject(reqCtx, 'Patient', patientId);
       expect(afterTransfer!.status).toBe('ACTIVE');
@@ -304,6 +310,13 @@ describe('Section 7.1: Patient Lifecycle', () => {
       const admittedLinks = await storage.getLinks(reqCtx, patientId, 'AdmittedTo', 'outbound');
       const activeAdmitted = admittedLinks.items.filter(l => !l._deletedAt);
       expect(activeAdmitted.length).toBe(0);
+
+      // The admission survives as history: this is what FHIR/CDM project as a
+      // finished Encounter and GraphQL's Patient.admissions returns.
+      const admissionHistory = await storage.getLinks(reqCtx, patientId, 'AdmittedTo', 'outbound', { includeDeleted: true });
+      expect(admissionHistory.items.length).toBe(1);
+      expect(admissionHistory.items[0]!._toId).toBe(wardAId);
+      expect(admissionHistory.items[0]!._deletedAt).toBeDefined();
 
       // All active OccupiesBed links soft-deleted
       const bedLinks = await storage.getLinks(reqCtx, patientId, 'OccupiesBed', 'outbound');

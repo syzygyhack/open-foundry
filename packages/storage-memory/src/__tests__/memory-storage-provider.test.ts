@@ -363,6 +363,21 @@ describe('MemoryStorageProvider', () => {
   // ─── Links ───
 
   describe('links', () => {
+    it('rejects a link ID already held by another tenant instead of overwriting it', async () => {
+      const pa = await provider.createObject(tenantA, 'Patient', { name: 'A' });
+      const ca = await provider.createObject(tenantA, 'CareTeam', { name: 'TA' });
+      const pb = await provider.createObject(tenantB, 'Patient', { name: 'B' });
+      const cb = await provider.createObject(tenantB, 'CareTeam', { name: 'TB' });
+      const link = await provider.createLink(tenantA, 'AssignedTo', pa._id, ca._id, { _engineLinkId: 'same-id' });
+      await provider.deleteLink(tenantA, 'AssignedTo', link._id);
+
+      await expect(
+        provider.createLink(tenantB, 'AssignedTo', pb._id, cb._id, { _engineLinkId: 'same-id' }),
+      ).rejects.toThrow(/already exists/);
+      const history = await provider.getLinks(tenantA, pa._id, 'AssignedTo', 'outbound', { includeDeleted: true });
+      expect(history.items.map((l) => l._id)).toEqual(['same-id']);
+    });
+
     it('creates and retrieves a link', async () => {
       const p = await provider.createObject(tenantA, 'Patient', { name: 'Linked' });
       const c = await provider.createObject(tenantA, 'CareTeam', { name: 'TeamA' });

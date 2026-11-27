@@ -211,6 +211,35 @@ function makeDeps(over: {
   return { deps, calls };
 }
 
+describe('CDM Encounter projection', () => {
+  it('reads every page of admissions, so old ones cannot crowd out the current one', async () => {
+    const { deps } = makeDeps({});
+    const mk = (i: number, deleted: boolean) => ({
+      _tenantId: 'tenant-1', _type: 'AdmittedTo', _id: `link-${i}`,
+      _fromType: 'Patient', _fromId: 'p-1', _toType: 'Ward', _toId: 'ward-1',
+      _version: 1, _createdAt: '2025-06-01T09:00:00Z', _updatedAt: '2025-06-01T09:00:00Z',
+      admissionDate: '2025-06-01T09:00:00Z',
+      ...(deleted ? { _deletedAt: '2025-06-02T09:00:00Z' } : {}),
+    });
+    const all = [...Array.from({ length: 100 }, (_, i) => mk(i, true)), mk(100, false)];
+    (deps.linkManager.getLinks as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_id: string, _t: string, _d: string, opts: { limit: number; offset: number }) => ({
+        items: all.slice(opts.offset, opts.offset + opts.limit),
+        totalCount: all.length,
+        hasNextPage: opts.offset + opts.limit < all.length,
+      }),
+    );
+    const router = createCdmRouter({ deps });
+    const res = await router({ method: 'GET', path: 'Encounter', query: { patient: 'p-1' }, user: makeUser() });
+    expect(res.status).toBe(200);
+    const body = res.body as { total: number; records: Array<Record<string, unknown>> };
+    expect(body.total).toBe(101);
+    const ids = body.records.map((r) => JSON.stringify(r['id'] ?? r['identifier'] ?? r));
+    expect(new Set(ids).size).toBe(101);
+    expect(JSON.stringify(body.records)).toContain('link-100');
+  });
+});
+
 describe('CDM router authorization type derivation', () => {
   it('derives snake_case FGA type for multi-word source types (DischargeRecord → discharge_record)', async () => {
     const { deps, calls } = makeDeps({

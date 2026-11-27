@@ -474,7 +474,7 @@ export async function getLinks(
   const limitParam = `$${params.length + 1}`;
   const offsetParam = `$${params.length + 2}`;
 
-  const dataSql = `SELECT * FROM ${table} WHERE ${whereClause} ORDER BY "_created_at" ASC LIMIT ${limitParam} OFFSET ${offsetParam}`;
+  const dataSql = `SELECT * FROM ${table} WHERE ${whereClause} ORDER BY "_created_at" ASC, "_id" ASC LIMIT ${limitParam} OFFSET ${offsetParam}`;
   const dataResult = await q.query(dataSql, paginationParams);
 
   const items = (dataResult.rows as Record<string, unknown>[]).map(

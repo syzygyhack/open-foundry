@@ -27,6 +27,7 @@ import type {
 } from './types.js';
 import { mapPatientToFhir, mapEncounterToFhir } from './mappers.js';
 import { logger } from '../logger.js';
+import { getAllLinks } from '../utils.js';
 
 // ─── Request / Response types ───
 
@@ -317,19 +318,16 @@ async function handleEncounterSearch(
     // separate Encounter object type.
     // includeDeleted so discharged admissions (soft-deleted AdmittedTo links)
     // surface as finished Encounters — keeps parity with the CDM Encounter
-    // projection. (Postgres soft-deletes links; the memory provider hard-deletes,
-    // so finished encounters are only recoverable on the Postgres backend.)
-    const linkPage = await deps.linkManager.getLinks(
-      patientId,
-      'AdmittedTo',
-      'outbound',
-      { limit: 100, offset: 0, includeDeleted: true },
-      ctx,
+    // projection. Both storage providers soft-delete links.
+    // All pages: history comes oldest first, so one page of past admissions
+    // could otherwise push out the current one.
+    const admissions = await getAllLinks(
+      deps.linkManager, patientId, 'AdmittedTo', 'outbound', { includeDeleted: true }, ctx,
     );
 
     // Convert links to OntologyObject-shaped records for the mapper.
     // AdmittedTo link properties: admissionDate, expectedDischarge, reason.
-    const encounterObjects = linkPage.items.map(link => ({
+    const encounterObjects = admissions.map(link => ({
       _tenantId: link._tenantId,
       _type: 'Encounter',
       _id: link._id,
