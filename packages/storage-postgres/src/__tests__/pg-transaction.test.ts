@@ -92,6 +92,31 @@ describe('PgTransaction', () => {
       expect(mockClient.release).toHaveBeenCalledOnce();
     });
 
+    it('a failed COMMIT finishes the transaction and discards the client', async () => {
+      const tx = await PgTransaction.begin(mockPool);
+      (mockClient.query as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('connection lost'));
+
+      await expect(tx.commit()).rejects.toThrow('connection lost');
+      // Session state is unknown after a failed COMMIT: destroy, do not pool.
+      expect(mockClient.release).toHaveBeenCalledWith(true);
+      expect(tx.isOpen).toBe(false);
+      // The caller's cleanup (rollback in a catch) must not mask the error or
+      // touch the released client.
+      await expect(tx.rollback()).resolves.toBeUndefined();
+      expect(mockClient.release).toHaveBeenCalledOnce();
+    });
+
+    it('COMMIT answered with ROLLBACK throws, and the following rollback is a no-op', async () => {
+      const tx = await PgTransaction.begin(mockPool);
+      (mockClient.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ command: 'ROLLBACK', rows: [] });
+
+      await expect(tx.commit()).rejects.toThrow(/aborted/);
+      expect(tx.isOpen).toBe(false);
+      await expect(tx.rollback()).resolves.toBeUndefined();
+      expect(mockClient.release).toHaveBeenCalledOnce();
+      await expect(tx.commit()).rejects.toThrow(/already finished/);
+    });
+
     it('throws if transaction already committed', async () => {
       const tx = await PgTransaction.begin(mockPool);
       await tx.commit();

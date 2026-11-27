@@ -18,18 +18,16 @@ import type {
   DateTime,
   LinkTypeDefinition,
 } from '@openfoundry/spi';
-import { createLogger } from '@openfoundry/observability';
 
-const logger = createLogger('storage-postgres');
 import { snakeCase, pgIdent } from '../schema/type-mapping.js';
 import { PgTransaction, resolveQueryable } from '../transactions/index.js';
+import { ageQuery } from '../graph/age-query.js';
 import type { Queryable } from '../transactions/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const GRAPH_NAME = 'openfoundry';
 
 /**
  * Sanitize a value for inclusion in an AGE Cypher string literal.
@@ -101,21 +99,6 @@ function linkTableName(type: string, schema = 'public'): string {
   return `${pgIdent(schema)}.${pgIdent(snakeCase(type))}`;
 }
 
-/** AGE Cypher queries use the ag_catalog schema. */
-async function ageQuery(q: Queryable, cypher: string): Promise<void> {
-  try {
-    await q.query(`SET search_path = ag_catalog, "$user", public`);
-    await q.query(
-      `SELECT * FROM cypher('${GRAPH_NAME}', $$${cypher}$$) AS (v agtype)`,
-    );
-  } catch (err) {
-    // AGE might not be available (e.g., in tests without AGE extension).
-    // Log but don't fail — graceful degradation for graph operations.
-    if (process.env.NODE_ENV !== 'test') {
-      logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'AGE graph operation failed');
-    }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Cardinality enforcement

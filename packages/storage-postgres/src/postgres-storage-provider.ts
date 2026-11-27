@@ -39,6 +39,7 @@ import type {
 } from '@openfoundry/spi';
 
 // ─── Module imports ───
+import { createLogger } from '@openfoundry/observability';
 import { generateDDL } from './schema/index.js';
 import { pgIdent, snakeCase, pgIndexMethod } from './schema/type-mapping.js';
 import {
@@ -66,6 +67,7 @@ import {
 import { PgTransaction } from './transactions/index.js';
 import { withRetry } from './retry.js';
 
+const logger = createLogger('storage-postgres');
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -212,14 +214,14 @@ export class PostgresStorageProvider implements StorageProvider {
     const fromVersion = this._currentSchemaVersion;
     const ddl = generateDDL(schema, { dataSchema: this._dataSchema });
 
-    // Ensure migration tracking table exists
-    await this._pool.query(`
-      CREATE TABLE IF NOT EXISTS _schema_migrations (
-        version INT PRIMARY KEY,
-        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        checksum TEXT
-      )
-    `);
+    // The migration ledger lives in the data schema it describes, named
+    // explicitly. Left unqualified it resolved through each connection's
+    // search_path: two providers on different data schemas shared one ledger
+    // (and failed each other's checksums), and a connection whose search_path
+    // had been pointed at ag_catalog created and read a second, empty ledger
+    // there. _ensureLedger carries the old ledger's history across.
+    const ledger = `${pgIdent(this._dataSchema)}."_schema_migrations"`;
+    await this._ensureLedger(ledger);
 
     // Compute DDL checksum from ontology-specific DDL only.
     // Platform DDL (consent) is excluded because it's applied idempotently
@@ -233,7 +235,7 @@ export class PostgresStorageProvider implements StorageProvider {
 
     // Check if this version is already applied (cheap check before acquiring lock)
     const existing = await this._pool.query(
-      'SELECT checksum FROM _schema_migrations WHERE version = $1',
+      `SELECT checksum FROM ${ledger} WHERE version = $1`,
       [schema.version],
     );
     if (existing.rows.length > 0) {
@@ -260,6 +262,7 @@ export class PostgresStorageProvider implements StorageProvider {
     // Use a dedicated client for the entire migration to ensure advisory lock
     // is held on the same session. pg_advisory_xact_lock auto-releases on COMMIT.
     const client = await this._pool.connect();
+    let broken = false;
     try {
       await client.query('BEGIN');
       // Transaction-scoped advisory lock — released automatically on COMMIT/ROLLBACK
@@ -267,7 +270,7 @@ export class PostgresStorageProvider implements StorageProvider {
 
       // Re-check after acquiring lock (another instance may have applied it)
       const recheck = await client.query(
-        'SELECT checksum FROM _schema_migrations WHERE version = $1',
+        `SELECT checksum FROM ${ledger} WHERE version = $1`,
         [schema.version],
       );
       if (recheck.rows.length > 0) {
@@ -304,16 +307,36 @@ export class PostgresStorageProvider implements StorageProvider {
 
       // Record migration
       await client.query(
-        'INSERT INTO _schema_migrations (version, checksum) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING',
+        `INSERT INTO ${ledger} (version, checksum) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING`,
         [schema.version, checksum],
       );
 
       await client.query('COMMIT');
     } catch (err) {
-      await client.query('ROLLBACK');
+      // Keep the migration's own error: a failed ROLLBACK means the connection
+      // is unusable, so discard it rather than report that instead.
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        broken = true;
+      }
       throw err;
     } finally {
-      client.release();
+      // The graph setup DDL runs `SET search_path = ag_catalog, ...`, and a
+      // session-level SET survives COMMIT. Its text is part of the migration
+      // checksum, so it cannot become SET LOCAL without failing the checksum of
+      // every database it already ran on; reset the session instead, before the
+      // connection goes back to the pool. Pool connections belong to the
+      // provider and run on the default path, so RESET restores what was there.
+      // If even that fails, discard the connection.
+      if (!broken) {
+        try {
+          await client.query('RESET search_path');
+        } catch {
+          broken = true;
+        }
+      }
+      client.release(broken);
     }
 
     this._currentSchemaVersion = schema.version;
@@ -326,6 +349,106 @@ export class PostgresStorageProvider implements StorageProvider {
       toVersion: schema.version,
       appliedAt: now,
     };
+  }
+
+  /**
+   * Create this data schema's migration ledger on first use, and adopt the
+   * history of the ledger the provider used before the name was qualified.
+   *
+   * That ledger was whatever `_schema_migrations` resolved to through the
+   * session's default search_path, `"$user", public`. With the compose and Helm
+   * defaults (role `openfoundry`, AGE graph `openfoundry` created before the
+   * first boot) "$user" names the graph's schema, so the old ledger lives in
+   * `openfoundry._schema_migrations`, not in public. Without adoption, an
+   * upgraded database would look unmigrated: its DDL would be replayed, and the
+   * checksum drift check skipped, for every version it already applied.
+   *
+   * Only a data schema the old code migrated has history to adopt, so a data
+   * schema holding none of this provider's object or link tables starts with
+   * an empty ledger. (An ontology with no types leaves no such table; its
+   * history is not adopted, and its DDL, which creates no data tables, runs
+   * again.) Without that check, every new data schema in a database with an
+   * old ledger (for example public's) would inherit that ledger's versions and
+   * fail their checksums, which is the sharing this change removes. A data
+   * schema with such tables in it adopts whatever the old name resolves to, which is
+   * the ledger the old code read for it; where that is the data schema's own
+   * ledger (no "$user" schema, data in public), it is used as it is.
+   *
+   * Rows are copied, not moved; the old table is left in place. A legacy
+   * ledger shared by several migrated data schemas is copied into each, which
+   * keeps exactly the history each one saw before.
+   */
+  private async _ensureLedger(ledger: string): Promise<void> {
+    const exists = await this._pool.query<{ oid: number | null }>(
+      'SELECT to_regclass($1)::oid AS oid',
+      [ledger],
+    );
+    if (exists.rows[0]?.oid) return;
+
+    const client = await this._pool.connect();
+    let broken = false;
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock($1)', [0x4F46]);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ${ledger} (
+          version INT PRIMARY KEY,
+          applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          checksum TEXT
+        )
+      `);
+      // Resolve the old, unqualified name as the old code did on a clean
+      // connection; SET LOCAL ends with this transaction.
+      await client.query('SET LOCAL search_path TO DEFAULT');
+      const found = await client.query<{ legacy: string | null; same: boolean | null }>(
+        `SELECT to_regclass('_schema_migrations')::text AS legacy,
+                to_regclass('_schema_migrations') = to_regclass($1) AS same`,
+        [ledger],
+      );
+      const { legacy, same } = found.rows[0] ?? { legacy: null, same: null };
+      // Evidence of an earlier migration: a table this provider creates, which
+      // every object and link table is, recognised by its system columns
+      // (_tenant_id, _id, _version), not by name, since a later version may
+      // rename every type. Tables other code keeps in the schema do not count.
+      // The schema is looked up by the same quoted identifier the DDL uses, so
+      // its physical name matches.
+      const migrated = legacy && !same
+        ? ((await client.query(
+            `SELECT 1 FROM pg_class c
+              WHERE c.relnamespace = to_regnamespace($1)
+                AND c.relkind IN ('r', 'p')
+                AND (SELECT count(*) FROM pg_attribute a
+                      WHERE a.attrelid = c.oid AND NOT a.attisdropped
+                        AND a.attname IN ('_tenant_id', '_id', '_version')) = 3
+              LIMIT 1`,
+            [pgIdent(this._dataSchema)],
+          )).rowCount ?? 0) > 0
+        : false;
+      if (legacy && !same && migrated) {
+        // regclass::text renders a name that is valid in this session.
+        const copied = await client.query(
+          `INSERT INTO ${ledger} (version, applied_at, checksum)
+           SELECT version, applied_at, checksum FROM ${legacy}
+           ON CONFLICT (version) DO NOTHING`,
+        );
+        if ((copied.rowCount ?? 0) > 0) {
+          logger.info(
+            { from: legacy, to: ledger, records: copied.rowCount },
+            'Adopted migration records from the legacy ledger',
+          );
+        }
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        broken = true;
+      }
+      throw err;
+    } finally {
+      client.release(broken);
+    }
   }
 
   async getSchema(_ctx: RequestContext, version?: number): Promise<OntologySchema> {

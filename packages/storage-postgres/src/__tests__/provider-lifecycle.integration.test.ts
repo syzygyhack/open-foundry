@@ -110,6 +110,9 @@ describeWithPg('PostgresStorageProvider lifecycle (integration)', () => {
       DROP TABLE IF EXISTS "public"."bed" CASCADE;
       DROP TABLE IF EXISTS "public"."admitted_to" CASCADE;
       DROP TABLE IF EXISTS "public"."bed_in_ward" CASCADE;
+      -- The ledger too: with it left behind, a re-run against the same
+      -- database sees version 1 as applied and never recreates the tables.
+      DROP TABLE IF EXISTS "public"."_schema_migrations";
     `);
   });
 

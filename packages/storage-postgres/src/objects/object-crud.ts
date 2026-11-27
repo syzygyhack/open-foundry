@@ -17,18 +17,16 @@ import type {
   ObjectPage,
   DateTime,
 } from '@openfoundry/spi';
-import { createLogger } from '@openfoundry/observability';
 import { snakeCase, pgIdent, fieldCol } from '../schema/type-mapping.js';
 
-const logger = createLogger('storage-postgres');
 import { filterToSql } from './filter-to-sql.js';
 import { PgTransaction, resolveQueryable } from '../transactions/index.js';
+import { ageQuery } from '../graph/age-query.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const GRAPH_NAME = 'openfoundry';
 
 /**
  * Sanitize a value for inclusion in an AGE Cypher string literal.
@@ -430,24 +428,6 @@ async function insertHistory(
 // Apache AGE graph helpers
 // ---------------------------------------------------------------------------
 
-/**
- * AGE Cypher queries use the ag_catalog schema.
- * We set the search_path before executing Cypher.
- */
-async function ageQuery(q: Pool | import('pg').PoolClient, cypher: string): Promise<void> {
-  try {
-    await q.query(`SET search_path = ag_catalog, "$user", public`);
-    await q.query(
-      `SELECT * FROM cypher('${GRAPH_NAME}', $$${cypher}$$) AS (v agtype)`,
-    );
-  } catch (err) {
-    // AGE might not be available (e.g., in tests without AGE extension).
-    // Log but don't fail — graceful degradation for graph operations.
-    if (process.env.NODE_ENV !== 'test') {
-      logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'AGE graph operation failed');
-    }
-  }
-}
 
 async function createAgeVertex(
   q: Pool | import('pg').PoolClient,

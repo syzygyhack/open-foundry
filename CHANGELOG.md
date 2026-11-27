@@ -80,6 +80,40 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **The Postgres provider no longer leaves pooled connections pointed at
+  `ag_catalog`, or loses writes to a failed graph-mirror update.** The AGE graph
+  setup DDL and the Cypher helpers ran a session-level
+  `SET search_path = ag_catalog, ...`, which stayed on the pooled connection.
+  When the helper was handed the pool, the `SET` and the `cypher()` call could
+  also run on different connections, so the mirror write failed silently.
+  Inside a transaction, a failed mirror write was worse: it aborted the
+  transaction, and `COMMIT` then rolled back the caller's SQL write while
+  reporting success. Changes:
+  - The helpers now send `SET LOCAL` and the query as one message. Inside a
+    transaction they run under a savepoint, queued per connection, and restore
+    the caller's `search_path` afterwards.
+  - Mirror writes need AGE preloaded in every session
+    (`shared_preload_libraries` or `session_preload_libraries`), as the
+    `apache/age` image used by compose and CI has it. For Helm with an external
+    database, set this on the server; otherwise a mirror write on a connection
+    where AGE is not yet loaded fails and is logged, as before (the migration
+    connection has loaded it, and on others AGE may load during that first
+    failed write, so later ones can succeed).
+  - `commit()` now throws when the server answers `COMMIT` with `ROLLBACK`;
+    after a failed commit, `rollback()` is a no-op, so cleanup cannot mask the
+    error.
+  - The migration connection resets its `search_path` before going back to the
+    pool.
+
+  The migration ledger (`_schema_migrations`) is now named in its data schema
+  rather than resolved through `search_path`. On first use, in a data schema
+  the old code migrated (one holding the provider's object or link tables), it
+  adopts the history of the ledger the old name resolved to; any other data
+  schema starts empty. With the compose and Helm
+  defaults that ledger is `openfoundry._schema_migrations` (the AGE graph's
+  schema, through `"$user"`), not `public`. Without the adoption, upgraded
+  databases would have replayed their DDL and skipped the checksum drift check.
+
 - **Discharged admissions no longer vanish on the in-memory store.** The memory
   storage provider hard-deleted links while the Postgres provider soft-deletes
   them. Link history therefore came back empty whenever the gateway ran without

@@ -12,6 +12,8 @@ import type { PoolClient, Pool } from 'pg';
 export class PgTransaction {
   private _committed = false;
   private _rolledBack = false;
+  /** COMMIT did not commit: the server rolled back, or the query failed. */
+  private _failed = false;
   private _client: PoolClient;
 
   private constructor(client: PoolClient) {
@@ -31,25 +33,52 @@ export class PgTransaction {
     }
   }
 
-  /** Access the underlying PoolClient for queries within this transaction. */
+  /**
+   * Access the underlying PoolClient for queries within this transaction.
+   * Operations on one transaction must be awaited in turn, not run
+   * concurrently: the client is a single session.
+   */
   get client(): PoolClient {
     this.assertOpen();
     return this._client;
   }
 
-  /** Commit and release the client back to the pool. */
+  /**
+   * Commit and release the client back to the pool. Throws if nothing was
+   * committed; the transaction is then finished, and a following rollback()
+   * is a no-op, so a caller's cleanup cannot mask the commit error.
+   */
   async commit(): Promise<void> {
     this.assertOpen();
+    let result: { command: string } | undefined;
+    let error: unknown;
     try {
-      await this._client.query('COMMIT');
-      this._committed = true;
-    } finally {
-      this._client.release();
+      result = await this._client.query('COMMIT');
+    } catch (err) {
+      error = err;
     }
+    // COMMIT on a transaction that already hit an error does not fail: the
+    // server rolls back and answers with the command tag ROLLBACK. Treating
+    // that as success reported writes that were never stored.
+    const aborted = error === undefined && result?.command === 'ROLLBACK';
+    if (error === undefined && !aborted) {
+      this._committed = true;
+      this._client.release();
+      return;
+    }
+    this._failed = true;
+    // A failed COMMIT query leaves the session in an unknown state: discard it.
+    this._client.release(error !== undefined);
+    if (aborted) {
+      throw new Error('Transaction was aborted by an earlier error and has been rolled back; nothing was committed');
+    }
+    throw error;
   }
 
   /** Rollback and release the client back to the pool. */
   async rollback(): Promise<void> {
+    // After a failed commit there is nothing left to roll back.
+    if (this._failed) return;
     this.assertOpen();
     try {
       await this._client.query('ROLLBACK');
@@ -60,12 +89,13 @@ export class PgTransaction {
   }
 
   get isOpen(): boolean {
-    return !this._committed && !this._rolledBack;
+    return !this._committed && !this._rolledBack && !this._failed;
   }
 
   private assertOpen(): void {
     if (this._committed) throw new Error('Transaction already committed');
     if (this._rolledBack) throw new Error('Transaction already rolled back');
+    if (this._failed) throw new Error('Transaction already finished: its commit failed');
   }
 }
 
