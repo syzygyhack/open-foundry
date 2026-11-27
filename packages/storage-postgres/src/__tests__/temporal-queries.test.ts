@@ -186,7 +186,9 @@ describe('getObjectAtTime', () => {
 
     const queryFn = pool.query as ReturnType<typeof vi.fn>;
     const [sql, params] = queryFn.mock.calls[0]!;
-    expect(sql).toContain('_history_created_at');
+    // The version's own timestamp, not the history insert time.
+    expect(sql).toContain('"_updated_at" <= $3');
+    expect(sql).not.toContain('_history_created_at');
     expect(sql).toContain('ORDER BY "_version" DESC LIMIT 1');
     expect(params).toEqual(['tenant-xyz', 'patient-1', timestamp]);
   });

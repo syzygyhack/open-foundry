@@ -186,6 +186,28 @@ export function registerTemporalTests(name: string, factory: ProviderFactory): v
         expect(result!.age).toBe(41);
       });
 
+      it('getObjectAtTime one millisecond before an update returns the previous version', async () => {
+        const created = await provider.createObject(ctx, 'Patient', { name: 'Bob', age: 40 });
+        await tick();
+        const updated = await provider.updateObject(ctx, 'Patient', created._id, { name: 'Bob Updated' });
+        const justBefore = new Date(new Date(updated._updatedAt).getTime() - 1).toISOString();
+        const result = await provider.getObjectAtTime(ctx, 'Patient', created._id, justBefore);
+        expect(result).not.toBeNull();
+        expect(result!._version).toBe(created._version);
+        expect(result!.name).toBe('Bob');
+      });
+
+      it('getObjectAtTime at a soft delete returns the deleted snapshot', async () => {
+        const created = await provider.createObject(ctx, 'Patient', { name: 'Bob', age: 40 });
+        await tick();
+        await provider.deleteObject(ctx, 'Patient', created._id, 'soft');
+        const deleted = await provider.getObjectAtVersion(ctx, 'Patient', created._id, created._version + 1);
+        expect(deleted).not.toBeNull();
+        const result = await provider.getObjectAtTime(ctx, 'Patient', created._id, deleted!._updatedAt);
+        expect(result!._version).toBe(created._version + 1);
+        expect(result!._deletedAt).toBeDefined();
+      });
+
       it('getObjectAtTime returns null for timestamp before object creation', async () => {
         const pastTimestamp = new Date(Date.now() - 60_000).toISOString();
 

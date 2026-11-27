@@ -40,14 +40,6 @@ const knownFailures: KnownFailures = {
     reason: 'An unset declared link property reads back as null on Postgres and is absent on memory.',
     error: /^expected null to be undefined$/,
   },
-  'Temporal > Point-in-time by timestamp > getObjectAtTime returns object state at creation time': {
-    reason: 'getObjectAtTime returns null for a timestamp just after creation; not yet investigated.',
-    error: /^expected null not to be null$/,
-  },
-  'Temporal > Point-in-time by timestamp > getObjectAtTime returns updated state after update timestamp': {
-    reason: 'getObjectAtTime returns the pre-update state for a timestamp just after an update; not yet investigated.',
-    error: /^expected 'Bob' to be 'Bob Updated' \/\/ Object\.is equality$/,
-  },
   'Lineage > lineage via graph traversal > traversal with filters narrows results': {
     reason: 'traverse returns both edges where the step filter should leave one; not yet investigated.',
     error: /^expected \[ \{ …\(\d+\) \}, \{ …\(\d+\) \} \] to have a length of 1 but got 2$/,

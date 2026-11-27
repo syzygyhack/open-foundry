@@ -97,6 +97,14 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Point-in-time reads on Postgres return the version in force at the
+  requested time.** `getObjectAtTime` compared the cutoff with the time the
+  history row was written (the database clock, a few milliseconds after the
+  version's own timestamp), so a read at a version's own timestamp returned the
+  version before it, and any clock skew between gateway and database shifted
+  every answer. It now compares the version's own `_updated_at`, as the memory
+  provider does; existing history rows already carry it.
+
 - **The Postgres provider no longer leaves pooled connections pointed at
   `ag_catalog`, or loses writes to a failed graph-mirror update.** The AGE graph
   setup DDL and the Cypher helpers ran a session-level

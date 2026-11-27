@@ -94,11 +94,18 @@ export async function getObjectAtVersion(
 /**
  * Get the state of an object at a specific point in time.
  *
- * Queries the history table for the most recent version that was created
- * at or before the given timestamp. Uses _history_created_at to find the
- * correct snapshot.
+ * Returns the highest version whose recorded update time (`_updated_at`, the
+ * version's own timestamp, set by the writer) is at or before the cutoff, as
+ * the memory provider does. Not `_history_created_at`: that is the database
+ * clock at history insert (transaction start inside a transaction), a few
+ * milliseconds after `_updated_at` even on one host, so a read at a version's
+ * own timestamp returned the version before it, and any gateway/database
+ * clock skew shifted every answer.
  *
- * Returns null if no history entry exists at or before the given time.
+ * Versions written by gateways whose clocks disagree can carry timestamps out
+ * of version order; the rule stays "highest version at or before the cutoff".
+ *
+ * Returns null if no version exists at or before the given time.
  */
 export async function getObjectAtTime(
   pool: Pool,
@@ -112,12 +119,7 @@ export async function getObjectAtTime(
   const q = resolveQueryable(pool, tx);
   const table = historyTableName(type, schema);
 
-  // NOTE: _history_created_at is set at history insertion time, which may be
-  // slightly after the _createdAt/_updatedAt timestamps on the object itself.
-  // For exact-timestamp queries using object timestamps, there may be a
-  // sub-millisecond mismatch. In practice this is safe because callers
-  // typically query with "a moment after" semantics (>= object timestamp).
-  const sql = `SELECT * FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2 AND "_history_created_at" <= $3 ORDER BY "_version" DESC LIMIT 1`;
+  const sql = `SELECT * FROM ${table} WHERE "_tenant_id" = $1 AND "_id" = $2 AND "_updated_at" <= $3 ORDER BY "_version" DESC LIMIT 1`;
   const result = await q.query(sql, [ctx.tenantId, id, timestamp]);
 
   if (result.rows.length === 0) return null;
