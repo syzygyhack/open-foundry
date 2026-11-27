@@ -1,18 +1,112 @@
-{{- if .Values.postgresql.enabled -}}
+{{- /*
+  DEPRECATED: the chart ships no PostgreSQL server; this only creates a claim.
+  It is kept for releases that already have one (an external workload may
+  mount it) and will be removed in a future release.
+
+  resource-policy keep stops Helm deleting a claim (and, under a Delete
+  reclaim policy, its volume) when it leaves the release. Helm reads that
+  annotation from the live object, though, and a claim created by an older
+  chart has none. So on an upgrade, every claim this release owns is
+  rendered again, under its own name and with its live spec (bound fields
+  cannot change), even after postgresql.enabled is turned off or the release
+  is renamed with fullnameOverride/nameOverride: the upgrade then adds the
+  annotation instead of deleting the claim. A claim is this release's when
+  Helm's release-name and release-namespace annotations name it, and it is
+  either labelled component postgresql or named <something>-postgresql (the
+  only claim this chart has ever made; the name still matches if the label
+  was edited). To let one go, delete it with kubectl once nothing mounts it;
+  the next upgrade no longer renders it. When the value is on and its claim
+  already exists, the claim keeps its live accessModes, storageClassName,
+  volumeMode and volumeName (fixed once bound) and takes only its size from
+  the values, so turning the value off and on again patches nothing it may
+  not.
+
+  The lookup lists the namespace's claims, so an upgrade needs list on
+  persistentvolumeclaims there (a fresh install does not look).
+  postgresql.retainExistingClaims=false skips it, for deployers without that
+  permission once every claim of the release is annotated keep or gone (an
+  unannotated claim that is no longer rendered is then deleted). The claim
+  the values ask for is still looked up by name (get, which patching it
+  needs anyway), so it keeps its live bound fields.
+
+  Going back to an earlier chart with the value on (helm rollback to a
+  revision it rendered, or an upgrade with it) fails while the claim exists:
+  its manifest leaves out fields this one sets from the live claim, and
+  Kubernetes refuses to clear them. The claim is kept; with the value off the
+  earlier chart no longer renders the claim and keep protects it. `helm
+  template` and a client-side --dry-run see no live claims and render only
+  what the values ask for; --dry-run=server sees them.
+*/ -}}
+{{- $name := printf "%s-postgresql" (include "openfoundry.fullname" .) -}}
+{{- $owned := list -}}
+{{- $current := dict -}}
+{{- $live := dict -}}
+{{- if and .Release.IsUpgrade (ne .Values.postgresql.retainExistingClaims false) -}}
+{{- $live = lookup "v1" "PersistentVolumeClaim" .Release.Namespace "" -}}
+{{- end -}}
+{{- range $pvc := (get (default dict $live) "items" | default list) -}}
+{{- $meta := get $pvc "metadata" | default dict -}}
+{{- $ann := get $meta "annotations" | default dict -}}
+{{- $lbl := get $meta "labels" | default dict -}}
+{{- $ours := or (eq (get $lbl "app.kubernetes.io/component" | toString) "postgresql") (hasSuffix "-postgresql" (get $meta "name" | toString)) -}}
+{{- if and (eq (get $ann "meta.helm.sh/release-name" | toString) $.Release.Name) (eq (get $ann "meta.helm.sh/release-namespace" | toString) $.Release.Namespace) $ours -}}
+{{- if and $.Values.postgresql.enabled (eq (get $meta "name" | toString) $name) -}}
+{{- $current = $pvc -}}
+{{- else -}}
+{{- $owned = append $owned $pvc -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- /* With the namespace-wide lookup off, still find the values-driven claim
+       by name (Helm needs get on it to patch it anyway), so its live bound
+       fields stay in the manifest. */ -}}
+{{- if and .Release.IsUpgrade .Values.postgresql.enabled (not $current) -}}
+{{- $byName := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $name -}}
+{{- $bmeta := get (default dict $byName) "metadata" | default dict -}}
+{{- $bann := get $bmeta "annotations" | default dict -}}
+{{- if and (eq (get $bann "meta.helm.sh/release-name" | toString) $.Release.Name) (eq (get $bann "meta.helm.sh/release-namespace" | toString) $.Release.Namespace) -}}
+{{- $current = $byName -}}
+{{- end -}}
+{{- end -}}
+{{- if .Values.postgresql.enabled }}
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "openfoundry.fullname" . }}-postgresql
+  name: {{ $name }}
+  annotations:
+    helm.sh/resource-policy: keep
   labels:
     {{- include "openfoundry.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgresql
 spec:
+  {{- if $current }}
+  {{- /* The live claim's fields that cannot change once bound, so a manifest
+         that carried them (the claim was rendered from the live spec while
+         the value was off) does not ask for their removal. */}}
+  {{- toYaml (pick $current.spec "accessModes" "storageClassName" "volumeMode" "volumeName") | nindent 2 }}
+  {{- else }}
   accessModes:
     {{- toYaml .Values.postgresql.persistence.accessModes | nindent 4 }}
   {{- if .Values.postgresql.persistence.storageClass }}
   storageClassName: {{ .Values.postgresql.persistence.storageClass | quote }}
   {{- end }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.postgresql.persistence.size }}
+{{- end }}
+{{- range $pvc := $owned }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvc.metadata.name }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "openfoundry.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  {{- toYaml (pick $pvc.spec "accessModes" "storageClassName" "resources" "volumeMode" "volumeName") | nindent 2 }}
 {{- end }}

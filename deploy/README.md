@@ -203,6 +203,50 @@ Release assets also include the OpenAPI, GraphQL and AsyncAPI contracts, a
 CycloneDX SBOM, and a build provenance attestation verifiable with
 `gh attestation verify <file> --repo syzygyhack/open-foundry`.
 
+### Database prerequisites
+
+The chart does not deploy PostgreSQL. It needs an external PostgreSQL 17 with
+Apache AGE 1.6 installed (the extension's files on the server; the compose
+stack and CI use the `apache/age:release_PG17_1.6.0` image), reachable at
+`storage.postgres.host` with the credentials in `storage.postgres.existingSecret`.
+
+- **Initialisation.** The chart's init job runs as a pre-install/pre-upgrade
+  hook, before the services start. It creates the `age` extension and the
+  `openfoundry` graph, and stops on the first SQL error.
+- **Privileges.** The init job and the services use the same role. It must be
+  a superuser, for two reasons: `CREATE EXTENSION age` requires one (AGE is not
+  a trusted extension), and each schema migration runs `LOAD 'age'`, which
+  PostgreSQL allows only to superusers when the library is named that way.
+  The migration's statement text is part of its checksum and cannot change.
+- **Preloading AGE** (`shared_preload_libraries = 'age'`) is recommended but no
+  longer required. Without it, every graph-mirror write loads AGE into its
+  session itself.
+
+`postgresql.enabled` is deprecated: it creates only a PersistentVolumeClaim
+(no server). Claims the release created are kept: while one exists, every
+upgrade keeps rendering it under its own name (with `helm.sh/resource-policy:
+keep`, spec copied from the live claim), even after `postgresql.enabled=false`
+or a rename through `fullnameOverride`/`nameOverride`, so no upgrade deletes
+it or, under a `Delete` reclaim policy, its volume. A claim counts as the
+release's when Helm's ownership annotations name the release and it is
+labelled `app.kubernetes.io/component: postgresql` or named `*-postgresql`.
+To find them, an upgrade lists the namespace's claims, so the account running
+`helm upgrade` needs `list` on `persistentvolumeclaims` there (a fresh
+install does not look). When the value is on and its claim exists, the claim
+keeps its live access modes, storage class and volume binding and takes only
+its size from the values. An upgrade that cannot list claims can skip the
+namespace-wide lookup with `postgresql.retainExistingClaims=false` (the claim
+the values ask for is still looked up by name), once every claim of the
+release carries the keep annotation (any upgrade with the default does that)
+or is gone: an unannotated claim that is no longer rendered is deleted. While
+the claim exists, going back to an earlier chart version (rollback or
+upgrade) with `postgresql.enabled=true` fails without touching it. Earlier versions of the chart
+did not annotate the claim; upgrading straight from one is safe for the same
+reason. To drop a claim once nothing mounts it, delete it with
+`kubectl delete pvc <name>`; the next upgrade no longer renders it.
+`helm template` and a client-side `--dry-run` cannot see live claims, so they
+show one only while the value is on; `--dry-run=server` sees them.
+
 ## Identity Provider (OIDC) Integration
 
 Production auth requires OIDC access tokens that satisfy

@@ -82,10 +82,32 @@ jobs:
         env:
           PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/openfoundry_test
         run: pnpm --filter @openfoundry/storage-postgres test
+      # Graph-mirror writes on a server that does not preload AGE, as many
+      # external databases do not. GitHub service containers cannot override
+      # the command, so this one is started here.
+      - name: AGE without preload
+        run: |
+          docker run -d --name age-nopreload -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=openfoundry_test -p 5433:5432 \
+            apache/age:release_PG17_1.6.0 postgres -c shared_preload_libraries=
+          # Over TCP: the image's temporary init server listens only on its socket.
+          for _ in $(seq 1 60); do
+            pg_isready -h localhost -p 5433 -U postgres && break
+            sleep 2
+          done
+          PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d openfoundry_test \
+            -v ON_ERROR_STOP=1 \
+            -c "CREATE EXTENSION IF NOT EXISTS age;" \
+            -c "LOAD 'age';" \
+            -c "SET search_path = ag_catalog, public;" \
+            -c "SELECT create_graph('openfoundry');"
+          PG_NOPRELOAD_TEST_URL=postgresql://postgres:postgres@localhost:5433/openfoundry_test \
+            pnpm --filter @openfoundry/storage-postgres exec vitest run age-no-preload
       # The SPI conformance suite against Postgres: the same contract the memory
-      # provider is held to. Divergences still to be decided are listed in
-      # tests/spi-conformance/src/known-failures.ts and reported as skipped; a
-      # listed one that starts passing fails the run so the entry gets removed.
+      # provider is held to. Open divergences are declared in
+      # tests/spi-conformance/src/postgres-provider.test.ts and reported as
+      # skipped; a declared one that starts passing fails the run so the entry
+      # gets removed.
       - name: SPI conformance (Postgres provider)
         env:
           PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/openfoundry_test

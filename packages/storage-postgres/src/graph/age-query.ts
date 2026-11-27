@@ -28,14 +28,13 @@ function inTransaction(q: Pool | PoolClient): q is PoolClient {
  * the path. SET LOCAL and the query go in one simple-protocol message, so they
  * share one connection and one transaction (implicit, or the caller's).
  *
- * AGE must already be loaded in the session, which in practice means
- * preloaded (shared_preload_libraries or session_preload_libraries; the
- * apache/age image sets the former). The helper does not run LOAD itself:
- * PostgreSQL checks LOAD's privilege before noticing the library is loaded,
- * so for a non-superuser runtime role it would fail even where AGE is
- * preloaded. Without preloading, a connection's first mirror write fails
- * and is logged unless the migration's LOAD already ran on it; AGE may load
- * during that failure, so later writes on the same connection can succeed.
+ * AGE need not be preloaded. Without preloading, a fresh session's first
+ * cypher() fails, because AGE rewrites cypher() through a parser hook its
+ * library installs when loaded. The message therefore starts with AGE_WARM,
+ * which loads it. The helper does not run LOAD 'age': PostgreSQL checks LOAD's
+ * privilege before noticing the library is loaded, so a non-superuser runtime
+ * role gets "access to library "age" is not allowed" even where AGE is
+ * preloaded.
  *
  * Inside a caller's transaction:
  * - The statement runs under a savepoint, created before the write is sent.
@@ -69,13 +68,22 @@ const queues = new WeakMap<PoolClient, Promise<void>>();
 
 const AGE_PATH = `SET LOCAL search_path = ag_catalog, "$user", public`;
 
+/**
+ * Loads AGE into the session if it is not loaded yet, without LOAD: casting
+ * to an AGE type calls into the library, whose load installs the parser hook
+ * the cypher() call that follows in the same message needs. A no-op where AGE
+ * is preloaded. Statements in one simple-protocol message are analysed one at
+ * a time, just before each runs, so the hook is in place in time.
+ */
+const AGE_WARM = `SELECT '1'::ag_catalog.agtype`;
+
 function cypherStatement(cypher: string): string {
   return `SELECT * FROM cypher('${GRAPH_NAME}', $$${cypher}$$) AS (v agtype)`;
 }
 
 async function runPooled(q: Pool | PoolClient, cypher: string): Promise<void> {
   try {
-    await q.query(`${AGE_PATH}; ${cypherStatement(cypher)}`);
+    await q.query(`${AGE_WARM}; ${AGE_PATH}; ${cypherStatement(cypher)}`);
   } catch (err) {
     warn(err);
   }
@@ -96,7 +104,7 @@ async function runInTransaction(q: PoolClient, cypher: string): Promise<void> {
     const shown = await q.query<{ search_path: string }>('SHOW search_path');
     const previousPath = shown.rows[0]!.search_path;
     await q.query(
-      `${AGE_PATH}; ${cypherStatement(cypher)}; ` +
+      `${AGE_WARM}; ${AGE_PATH}; ${cypherStatement(cypher)}; ` +
         `SELECT set_config('search_path', ${q.escapeLiteral(previousPath)}, true); ` +
         `RELEASE SAVEPOINT ${savepoint}`,
     );

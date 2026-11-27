@@ -319,9 +319,18 @@ initJob:
       cpu: 200m
       memory: 128Mi
 
-# -- PostgreSQL PVC (for bundled PostgreSQL; disable if using external)
+# -- DEPRECATED. The chart does not deploy PostgreSQL: it needs an external
+# PostgreSQL with Apache AGE (see deploy/README.md, "Database prerequisites").
+# This only creates a PersistentVolumeClaim, kept for existing releases and
+# never deleted by Helm (resource-policy: keep). It will be removed.
 postgresql:
   enabled: false
+  # On upgrade, find the claims this release made (also under an old name)
+  # and keep them, annotated helm.sh/resource-policy=keep. Needs `list` on
+  # persistentvolumeclaims in the namespace. Set false to skip the lookup,
+  # but only once no unannotated claim of this release is left: one that is
+  # no longer rendered is then deleted.
+  retainExistingClaims: true
   persistence:
     size: 10Gi
     storageClass: ""

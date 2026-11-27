@@ -97,6 +97,35 @@ are called out under **Breaking changes**.
 
 ### Fixed
 
+- **Graph-mirror writes work on databases that do not preload Apache AGE.**
+  Without `shared_preload_libraries = 'age'`, the first `cypher()` call in a
+  fresh session fails, so each new pooled connection lost its first mirror
+  write. Each write now loads AGE first by casting to an AGE type, which needs
+  no privileges (unlike `LOAD`, which a non-superuser may not run even where
+  AGE is preloaded).
+
+- **Helm: the database init job runs before the services, and fails on a SQL
+  error.** It was a post-install/post-upgrade hook, so it ran after the gateway
+  had started and tried to migrate a database without the AGE extension or
+  graph; and `psql` exited 0 after a failed statement, so the job reported
+  success. It is now a pre-install/pre-upgrade hook and runs `psql` with
+  `ON_ERROR_STOP`. `deploy/README.md` gains a "Database prerequisites" section
+  (external PostgreSQL with AGE, a superuser role, preload recommended).
+  `postgresql.enabled` is deprecated: it only ever created a volume claim, no
+  server. Claims the release created are now kept: the chart keeps rendering
+  each, under its own name, with `resource-policy: keep` while it exists, even
+  after the value is turned off or the release renamed, so an upgrade from an
+  earlier chart (whose claim had no such annotation) cannot delete it or its
+  volume. Turning the value off and on again keeps the claim's bound fields.
+  An upgrade finds claims by listing the namespace's, so the account running
+  `helm upgrade` needs `list` on persistentvolumeclaims there, or sets
+  `postgresql.retainExistingClaims=false` once its claims are annotated or
+  gone (the claim the values ask for is still looked up by name, which
+  patching it needs anyway). While the claim exists, rolling back or
+  downgrading to an earlier
+  chart with the value on fails (without deleting it);
+  `deploy/README.md` says how claims are matched and how to drop one.
+
 - **Point-in-time reads on Postgres return the version in force at the
   requested time.** `getObjectAtTime` compared the cutoff with the time the
   history row was written (the database clock, a few milliseconds after the
@@ -117,13 +146,8 @@ are called out under **Breaking changes**.
   - The helpers now send `SET LOCAL` and the query as one message. Inside a
     transaction they run under a savepoint, queued per connection, and restore
     the caller's `search_path` afterwards.
-  - Mirror writes need AGE preloaded in every session
-    (`shared_preload_libraries` or `session_preload_libraries`), as the
-    `apache/age` image used by compose and CI has it. For Helm with an external
-    database, set this on the server; otherwise a mirror write on a connection
-    where AGE is not yet loaded fails and is logged, as before (the migration
-    connection has loaded it, and on others AGE may load during that first
-    failed write, so later ones can succeed).
+  - Mirror writes load AGE into their session themselves, so they also work
+    where AGE is not preloaded, as on many external databases (see below).
   - `commit()` now throws when the server answers `COMMIT` with `ROLLBACK`;
     after a failed commit, `rollback()` is a no-op, so cleanup cannot mask the
     error.
