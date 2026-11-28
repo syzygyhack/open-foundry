@@ -179,9 +179,15 @@ jobs:
             dest="${registry}/${name}"
             docker tag "$src" "${dest}:${VERSION}"
             docker push "${dest}:${VERSION}"
-            digest=$(docker inspect --format='{{index .RepoDigests 0}}' "${dest}:${VERSION}" 2>/dev/null || true)
-            if [ -z "$digest" ]; then
-              digest="${dest}@$(docker manifest inspect "${dest}:${VERSION}" -v | jq -r '.Descriptor.digest' | head -1)"
+            # The digest the registry now serves for this tag, under the
+            # published name. (0.4.0 took the daemon's first RepoDigest, which
+            # was the local compose image, deploy-<svc>@sha256:..., and with the
+            # containerd image store the daemon's digest need not be the pushed
+            # manifest's at all.)
+            digest="${dest}@$(docker buildx imagetools inspect "${dest}:${VERSION}" --format '{{json .Manifest}}' | jq -r '.digest')"
+            if ! [[ "${digest#"${dest}@"}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::No registry digest for ${dest}:${VERSION} (got '${digest}')"
+              exit 1
             fi
             echo "$digest" >> image-digests.txt
             echo "pushed $digest"

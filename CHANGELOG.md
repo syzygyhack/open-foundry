@@ -75,6 +75,11 @@ are called out under **Breaking changes**.
   `hasNextPage` and `hasPreviousPage` the list, search and link routes
   return. The search route documents `fields`, `offset`, the limit's default
   (20) and maximum (100), its hit shape and its 400 and 403 responses.
+- **Release assets:** 0.4.0's `image-digests.txt` named the local compose
+  images (`deploy-api-gateway@sha256:...`) instead of the published ones;
+  the digests were right. The release now records
+  `ghcr.io/syzygyhack/open-foundry/<image>@sha256:...` as the registry
+  reports it after the push, and fails if it cannot.
 
 ## [0.4.0] - 2026-11-27
 
