@@ -10,6 +10,8 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-28
+
 ### Fixed
 
 - **Errors reach clients with the right code, and only platform errors
@@ -837,7 +839,8 @@ in-memory providers, ontology engine, action framework, security layer
 (OIDC/OpenFGA/consent/audit), sync engine, GraphQL/REST/FHIR APIs, Helm chart,
 and the NHS Acute, AML, and Supply Chain domain packs.
 
-[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/syzygyhack/open-foundry/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/syzygyhack/open-foundry/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/syzygyhack/open-foundry/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/syzygyhack/open-foundry/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/syzygyhack/open-foundry/compare/v0.2.3...v0.2.4

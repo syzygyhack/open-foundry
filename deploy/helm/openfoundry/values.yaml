@@ -11,7 +11,7 @@ image:
   # image-digests.txt), e.g.
   #   --set apiGateway.image.digest=sha256:<64 hex digits>
   # A service's image.repository is a bare path, without a tag or digest.
-  tag: "0.4.0"
+  tag: "0.4.1"
 
 imagePullSecrets: []
 nameOverride: ""

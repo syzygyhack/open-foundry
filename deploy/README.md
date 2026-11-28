@@ -200,7 +200,7 @@ kubectl create secret generic openfoundry-postgres \
 kubectl create secret generic openfoundry-pas --from-literal=dbUrl="$PAS_DB_URL"
 
 helm install openfoundry \
-  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.4.0 \
+  oci://ghcr.io/syzygyhack/open-foundry/charts/openfoundry --version 0.4.1 \
   --set storage.postgres.host="$PG_HOST" \
   --set auth.oidc.issuer="$OIDC_ISSUER" \
   --set auth.oidc.clientId="$OIDC_CLIENT_ID" \
