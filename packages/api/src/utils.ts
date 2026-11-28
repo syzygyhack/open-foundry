@@ -140,8 +140,8 @@ export function restrictedFieldNames(
  * The fields a search may look in when the caller has field restrictions and
  * names none: the type's visible text properties. Not the primary field (it
  * is stored as _id, not as a column), not system fields, and not properties
- * named with a leading underscore (storage resolves such a name as a system
- * column, `"_display_label"`, where the DDL made `"display_label"`). Possibly
+ * named with a leading underscore (the providers' default searches skip them
+ * too, so a caller with restrictions sees what one without would). Possibly
  * empty: storage then searches no field and finds nothing.
  */
 export function visibleSearchFields(visible: Set<string>, fields: FieldDefinition[]): string[] {

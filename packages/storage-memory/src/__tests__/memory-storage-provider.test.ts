@@ -835,4 +835,21 @@ describe('MemoryStorageProvider', () => {
       expect((await bare.getLinks(tenantA, a._id, 'AssignedTo', 'outbound')).items).toEqual([]);
     });
   });
+
+  describe('search', () => {
+    it('a property named like an Object.prototype member is searched and highlighted', async () => {
+      const p = new MemoryStorageProvider();
+      await p.applySchema(tenantA, {
+        version: 1,
+        objectTypes: [{ name: 'Badge', properties: [{ name: 'constructor', type: 'String' }] }],
+        linkTypes: [],
+      } as OntologySchema);
+      await p.createObject(tenantA, 'Badge', { constructor: 'STAFF' });
+      for (const fields of [undefined, ['constructor']]) {
+        const result = await p.searchObjects(tenantA, 'Badge', { query: 'staff', fields });
+        expect(result.hits).toHaveLength(1);
+        expect(result.hits[0]!.highlights).toEqual({ constructor: ['STAFF'] });
+      }
+    });
+  });
 });

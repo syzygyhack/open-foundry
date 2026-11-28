@@ -38,6 +38,43 @@ are called out under **Breaking changes**.
   (a connection error names hosts and ports): the client gets
   `CONSENT_WRITE_FAILED` with "Consent write failed"; the audit record keeps
   the cause.
+- **A PostgreSQL search on a named field finds the field's column, and a
+  field it cannot search is a 400.** Named fields went into the query as
+  `fieldColName(name)`. A declared property the DDL spells differently (a
+  declared `_label` is column `label`) failed with "column does not exist";
+  so did a name with no column, and a non-text column (an INTEGER, a DATE,
+  JSONB) failed with "operator does not exist". Each was a retryable 500.
+  The provider now resolves named fields against the table's columns: a
+  name first as it always has been, and only when that names no column, a
+  declared property by its own column. So every name that searched still
+  does, reaching the same column (`_id`, `_type`, `_tenantId`,
+  `family_name`, long names cut to 63 bytes, columns the schema no longer
+  declares, `char`, `"char"` and `citext` columns, domains over them), and
+  searches without named fields are unchanged. A declared name whose column
+  another declared property also has (`_label` beside `label`) is not
+  resolved to it. A name with no column or a non-text column is
+  `VALIDATION_ERROR`, naming the fields (`details.unknownFields`,
+  `details.nonTextFields`). The memory provider is unchanged: it searches the
+  named fields with string values and ignores the rest.
+- **A search page of none counts the hits.** On PostgreSQL, `limit: 0`
+  (GraphQL `first: 0`) returned `totalCount: 0, hasNextPage: false`, since
+  the count rides on the returned rows; it now runs the count, as a page past
+  the end already did. A negative GraphQL `first` reached storage as a
+  negative LIMIT (an error on PostgreSQL, a slice from the end on memory)
+  and now counts as 0.
+- **A repeated REST `fields` parameter is honoured.** `?fields=a&fields=b`
+  arrives as an array, which was ignored, so the default fields were
+  searched; every occurrence is now read, each comma-separated as before.
+  An empty `fields=` still names none, and `fields=,` still searches
+  nothing.
+- **A memory-provider search over a property named like an
+  `Object.prototype` member** (`constructor`) failed with a TypeError while
+  building highlights; it now matches and highlights it.
+- **OpenAPI:** the `Pagination` component named fields no response has
+  (`total`, `hasMore`); it now has the `totalCount`, `limit`, `offset`,
+  `hasNextPage` and `hasPreviousPage` the list, search and link routes
+  return. The search route documents `fields`, `offset`, the limit's default
+  (20) and maximum (100), its hit shape and its 400 and 403 responses.
 
 ## [0.4.0] - 2026-11-27
 

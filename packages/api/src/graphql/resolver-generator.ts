@@ -890,7 +890,9 @@ function generateSearchResolver(
         offset = decodeCursor(args.after) + 1;
       }
 
-      const limit = args.first ?? 20;
+      // Not below 0: a negative `first` reached storage as a negative LIMIT,
+      // an error on PostgreSQL and a slice from the end on memory.
+      const limit = Math.max(0, args.first ?? 20);
       type Hit = { object: OntologyObject; score: number };
       type ShapedHit = { node: Record<string, unknown>; score: number };
       const searchWith = (l: number, o: number): SearchQuery => ({

@@ -803,9 +803,14 @@ function generateSearchRoute(
 
         const authFilter = buildAuthFilter(allowedIds);
 
-        // Parse fields from comma-separated string
-        const fieldsRaw = typeof req.query['fields'] === 'string' ? req.query['fields'] : undefined;
-        const fields = fieldsRaw ? fieldsRaw.split(',').map((f) => f.trim()).filter((f) => f.length > 0) : undefined;
+        // Fields: comma-separated, in one `fields` parameter or several
+        // (?fields=a&fields=b arrives as an array, which was ignored, so the
+        // default fields were searched). An empty `fields=` names none.
+        const rawFields = req.query['fields'];
+        const occurrences = rawFields === undefined ? [] : Array.isArray(rawFields) ? rawFields : [rawFields];
+        const fields = occurrences.some((o) => o.length > 0)
+          ? occurrences.flatMap((o) => o.split(',')).map((f) => f.trim()).filter((f) => f.length > 0)
+          : undefined;
 
         // SEC-14: Validate search fields against redacted fields
         const visibleFields = deps.authorizationService.getVisibleFields(user.id, user.roles, typeName);

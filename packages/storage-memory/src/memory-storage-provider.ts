@@ -908,10 +908,12 @@ export class MemoryStorageProvider implements StorageProvider {
 
       // Count occurrences of query terms across matching fields
       let score = 0;
-      const highlights: Record<string, string[]> = {};
+      // Keyed by field name, so a Map: a property named like an
+      // Object.prototype member (constructor) must not reach the prototype.
+      const highlights = new Map<string, string[]>();
 
       for (const field of searchFields) {
-        const val = obj[field];
+        const val = Object.hasOwn(obj, field) ? obj[field] : undefined;
         if (typeof val !== 'string') continue;
         const valLower = val.toLowerCase();
 
@@ -924,10 +926,9 @@ export class MemoryStorageProvider implements StorageProvider {
           }
           if (count > 0) {
             score += count;
-            if (!highlights[field]) {
-              highlights[field] = [];
-            }
-            highlights[field].push(val);
+            const list = highlights.get(field) ?? [];
+            list.push(val);
+            highlights.set(field, list);
           }
         }
       }
@@ -942,7 +943,7 @@ export class MemoryStorageProvider implements StorageProvider {
       scored.push({
         object: clone(obj),
         score,
-        highlights: Object.keys(highlights).length > 0 ? highlights : undefined,
+        highlights: highlights.size > 0 ? Object.fromEntries(highlights) : undefined,
       });
     }
 

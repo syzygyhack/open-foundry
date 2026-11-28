@@ -554,7 +554,8 @@ export class PostgresStorageProvider implements StorageProvider {
   async searchObjects(ctx: RequestContext, type: string, query: SearchQuery): Promise<SearchResult> {
     this._guardObject(type);
     this._guardFilter('object', type, query.filter);
-    return withRetry(() => pgSearchObjects(this._pool, ctx, type, query, this._dataSchema));
+    const declared = this._guardSchema()?.objectTypes.find((t) => t.name === type)?.properties.map((p) => p.name) ?? [];
+    return withRetry(() => pgSearchObjects(this._pool, ctx, type, query, this._dataSchema, undefined, declared));
   }
 
   async bulkMutate(ctx: RequestContext, request: BulkMutationRequest): Promise<BulkMutationResult> {

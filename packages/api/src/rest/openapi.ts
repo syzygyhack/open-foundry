@@ -166,14 +166,43 @@ function objectPaths(obj: ObjectType): Record<string, unknown> {
       operationId: `search${obj.name}s`,
       parameters: [
         { name: 'q', in: 'query', required: true, schema: { type: 'string' }, description: 'Search query' },
-        { name: 'limit', in: 'query', schema: { type: 'integer', default: 25 } },
+        {
+          name: 'fields', in: 'query', schema: { type: 'string' },
+          description: 'Fields to search, comma-separated; the parameter may be repeated. '
+            + 'Omitted or empty: the provider\'s default text fields, or, for a caller with field '
+            + 'restrictions, that caller\'s visible String properties. Only separators (`,`) searches nothing. '
+            + 'On PostgreSQL, a name that is not a text column of the type is a 400 VALIDATION_ERROR.',
+        },
+        {
+          name: 'limit', in: 'query', schema: { type: 'integer', default: 20, minimum: 1, maximum: 100 },
+          description: 'Page size; 0 or a value that is not a number means the default, a larger value the maximum.',
+        },
+        { name: 'offset', in: 'query', schema: { type: 'integer', default: 0, minimum: 0 } },
       ],
       responses: {
         '200': {
-          description: 'Search results',
-          content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'array', items: { $ref: ref } } } } } },
+          description: 'Search results, best match first',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  data: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: { node: { $ref: ref }, score: { type: 'number' } },
+                    },
+                  },
+                  pagination: { $ref: '#/components/schemas/Pagination' },
+                },
+              },
+            },
+          },
         },
+        '400': { description: 'Missing q, or a field that cannot be searched' },
         '401': { $ref: '#/components/responses/Unauthorized' },
+        '403': { description: 'A named field is redacted for the caller' },
       },
     },
   };
@@ -403,12 +432,15 @@ export function generateOpenApiSpec(schema: ParsedSchema, version = '1.0.0'): Re
   // Shared schemas
   schemas['Pagination'] = {
     type: 'object',
+    // As the list, search and link routes return it.
     properties: {
-      offset: { type: 'integer' },
+      totalCount: { type: 'integer', description: 'Matching objects across all pages' },
       limit: { type: 'integer' },
-      total: { type: 'integer' },
-      hasMore: { type: 'boolean' },
+      offset: { type: 'integer' },
+      hasNextPage: { type: 'boolean' },
+      hasPreviousPage: { type: 'boolean' },
     },
+    required: ['totalCount', 'limit', 'offset', 'hasNextPage', 'hasPreviousPage'],
   };
   schemas['ErrorResponse'] = {
     type: 'object',

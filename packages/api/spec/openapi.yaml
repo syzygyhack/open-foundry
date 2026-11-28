@@ -154,14 +154,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -170,9 +187,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Customer"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Customer"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/customers/{id}:
     get:
       tags:
@@ -395,14 +423,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -411,9 +456,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Account"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Account"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/accounts/{id}:
     get:
       tags:
@@ -653,14 +709,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -669,9 +742,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Transaction"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Transaction"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/transactions/{id}:
     get:
       tags:
@@ -911,14 +995,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -927,9 +1028,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Alert"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Alert"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/alerts/{id}:
     get:
       tags:
@@ -1152,14 +1264,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -1168,9 +1297,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Case"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Case"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/cases/{id}:
     get:
       tags:
@@ -1392,14 +1532,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -1408,9 +1565,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/SuspiciousActivityReport"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/SuspiciousActivityReport"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/suspiciousActivityReports/{id}:
     get:
       tags:
@@ -1638,14 +1806,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -1654,9 +1839,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Patient"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Patient"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/patients/{id}:
     get:
       tags:
@@ -1853,14 +2049,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -1869,9 +2082,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Ward"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Ward"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/wards/{id}:
     get:
       tags:
@@ -2068,14 +2292,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -2084,9 +2325,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Bed"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Bed"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/beds/{id}:
     get:
       tags:
@@ -2283,14 +2535,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -2299,9 +2568,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Consultant"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Consultant"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/consultants/{id}:
     get:
       tags:
@@ -2504,14 +2784,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -2520,9 +2817,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Staff"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Staff"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/staffs/{id}:
     get:
       tags:
@@ -2732,14 +3040,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -2748,9 +3073,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/DischargeRecord"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/DischargeRecord"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/dischargeRecords/{id}:
     get:
       tags:
@@ -2960,14 +3296,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -2976,9 +3329,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Transfer"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Transfer"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/transfers/{id}:
     get:
       tags:
@@ -3205,14 +3569,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -3221,9 +3602,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Supplier"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Supplier"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/suppliers/{id}:
     get:
       tags:
@@ -3444,14 +3836,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -3460,9 +3869,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Facility"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Facility"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/facilitys/{id}:
     get:
       tags:
@@ -3677,14 +4097,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -3693,9 +4130,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Product"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Product"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/products/{id}:
     get:
       tags:
@@ -3929,14 +4377,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -3945,9 +4410,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/PurchaseOrder"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/PurchaseOrder"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/purchaseOrders/{id}:
     get:
       tags:
@@ -4189,14 +4665,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -4205,9 +4698,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Shipment"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/Shipment"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/shipments/{id}:
     get:
       tags:
@@ -4423,14 +4927,31 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: "Fields to search, comma-separated; the parameter may be repeated. Omitted or empty: the provider's default
+            text fields, or, for a caller with field restrictions, that caller's visible String properties. Only
+            separators (`,`) searches nothing. On PostgreSQL, a name that is not a text column of the type is a 400
+            VALIDATION_ERROR."
         - name: limit
           in: query
           schema:
             type: integer
-            default: 25
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Page size; 0 or a value that is not a number means the default, a larger value the maximum.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
       responses:
         "200":
-          description: Search results
+          description: Search results, best match first
           content:
             application/json:
               schema:
@@ -4439,9 +4960,20 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/InventoryRecord"
+                      type: object
+                      properties:
+                        node:
+                          $ref: "#/components/schemas/InventoryRecord"
+                        score:
+                          type: number
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Missing q, or a field that cannot be searched
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: A named field is redacted for the caller
   /api/v1/inventoryRecords/{id}:
     get:
       tags:
@@ -6265,14 +6797,23 @@ components:
     Pagination:
       type: object
       properties:
-        offset:
+        totalCount:
           type: integer
+          description: Matching objects across all pages
         limit:
           type: integer
-        total:
+        offset:
           type: integer
-        hasMore:
+        hasNextPage:
           type: boolean
+        hasPreviousPage:
+          type: boolean
+      required:
+        - totalCount
+        - limit
+        - offset
+        - hasNextPage
+        - hasPreviousPage
     ErrorResponse:
       type: object
       properties:
