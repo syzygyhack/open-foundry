@@ -6,6 +6,7 @@
  */
 
 import type { RequestContext, ObjectSetDefinition, ObjectSetStore } from '@openfoundry/spi';
+import { OpenFoundryError } from '@openfoundry/spi';
 import { generateUUIDv7 } from '../links/index.js';
 
 export class InMemoryObjectSetStore implements ObjectSetStore {
@@ -17,8 +18,10 @@ export class InMemoryObjectSetStore implements ObjectSetStore {
   ): Promise<ObjectSetDefinition> {
     // Enforce createdBy from request context — fail closed if unauthenticated
     if (!ctx.actorId) {
-      throw Object.assign(new Error('Cannot create object set without authenticated user'), {
+      throw new OpenFoundryError({
         code: 'UNAUTHENTICATED',
+        category: 'authorization',
+        message: 'Cannot create object set without authenticated user',
       });
     }
     const now = new Date().toISOString();

@@ -11,6 +11,7 @@ export type { DateTime, Duration } from './scalars.js';
 
 // Error model (Section 8.8)
 export type { ErrorCategory, ErrorCode, PlatformError } from './errors.js';
+export { ERROR_CATEGORIES, isPlatformError, OpenFoundryError } from './errors.js';
 
 // Core ontology types (Section 3.2)
 export type {

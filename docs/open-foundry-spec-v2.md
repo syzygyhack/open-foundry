@@ -2439,9 +2439,10 @@ Error categories:
 
 Transport mapping:
 
-1. GraphQL: error envelope appears in `errors[].extensions.openfoundry`.
+1. GraphQL: error envelope appears in `errors[].extensions.openfoundry`, and the same `code` in `errors[].extensions.code`, where GraphQL clients and gateways look for it.
 2. REST: envelope is returned in the response body (`{ "error": { ... } }`) with HTTP status mapping. FHIR: the FHIR handler, including its own authentication and rate-limit answers, returns errors as an `OperationOutcome`; the gateway-wide pre-authentication rate limiter runs first and can answer a FHIR URL with `429` and the REST envelope.
 3. SDKs: typed exceptions are generated from `code` + `category`.
+4. Only a platform error reaches the client with its own code, message and details: a thrown `PlatformError` (`code`, `category`, `message`, `retryable`; `OpenFoundryError` in the SPI is one), or an error carrying one of the well-known codes above. A provider marks an error, including one with its own extension code, that way. Any other error -- a database error with its SQLSTATE, a Node error (`ERR_INVALID_URL`, `ECONNREFUSED`), an SDK error -- is `INTERNAL_ERROR` with a generic message. System and timeout errors never carry their own message or details.
 
 ### 8.9 API Versioning Strategy
 

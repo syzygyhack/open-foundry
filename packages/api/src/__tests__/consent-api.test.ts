@@ -72,6 +72,15 @@ describe('applyConsentRecord', () => {
     }));
   });
 
+  it('a store failure is CONSENT_WRITE_FAILED with a generic message; the audit keeps the cause', async () => {
+    d.recordConsent.mockRejectedValueOnce(new Error('connect ECONNREFUSED 10.0.0.7:5432'));
+    const r = await applyConsentRecord(d.deps, { subject: 'p-1' }, ADMIN, 'default', 't1');
+    expect(r).toMatchObject({ ok: false, code: 'CONSENT_WRITE_FAILED', category: 'system', message: 'Consent write failed' });
+    expect(d.auditWrite).toHaveBeenCalledWith(expect.objectContaining({
+      detail: expect.objectContaining({ result: 'error', denialReason: 'connect ECONNREFUSED 10.0.0.7:5432' }),
+    }));
+  });
+
   it('rejects a missing subject', async () => {
     const r = await applyConsentRecord(d.deps, {}, ADMIN, 'default', 't1');
     expect(r.ok).toBe(false);

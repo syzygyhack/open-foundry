@@ -10,6 +10,35 @@ are called out under **Breaking changes**.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Errors reach clients with the right code, and only platform errors
+  carry their own.** GraphQL put the spec's envelope under
+  `errors[].extensions.openfoundry` and left `extensions.code` unset, so
+  Apollo Server filled in `INTERNAL_SERVER_ERROR` for every Open Foundry
+  error: a `FORBIDDEN` refusal or a `VALIDATION_ERROR` looked like a server
+  fault to clients and gateways that read `extensions.code`. It now mirrors
+  `openfoundry.code`. Both transports also decided an error's code from any
+  string `code` it carried, and its category from a fixed list of codes. A
+  PostgreSQL error reached clients with its SQLSTATE (`42703`) and a Node
+  error with its own code (`ERR_INVALID_URL`), while the platform's own
+  structured errors lost theirs: a saved Object Set update or delete of a
+  missing set was a retryable 500 instead of 404 `OBJECT_SET_NOT_FOUND`, a
+  non-creator's update a 500 whose message read `[object Object]`, and
+  `UNAUTHENTICATED` a 500. One classifier now serves REST and GraphQL: an
+  error that is a `PlatformError` (code, category, message, retryable --
+  the engine's and stores' structured errors, `SchemaGuardError`, and the new
+  SPI `OpenFoundryError`) keeps its code, category, message, retryability and
+  details; an `Error` with a well-known code (spec §8.8) keeps its code and
+  message; anything else is `INTERNAL_ERROR` with the generic message.
+  System and timeout errors never carry their own message or details, and a
+  `GraphQLError` the API did not build is classified like any other error. A
+  provider marks its own extension codes by throwing a `PlatformError`.
+- **A failed consent write no longer returns the store's error message**
+  (a connection error names hosts and ports): the client gets
+  `CONSENT_WRITE_FAILED` with "Consent write failed"; the audit record keeps
+  the cause.
+
 ## [0.4.0] - 2026-11-27
 
 ### Breaking changes

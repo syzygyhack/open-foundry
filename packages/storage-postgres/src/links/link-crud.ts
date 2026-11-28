@@ -18,7 +18,7 @@ import type {
   DateTime,
   LinkTypeDefinition,
 } from '@openfoundry/spi';
-import { SchemaGuardError, encodeLinkCursor, decodeLinkCursor, assertCursorOrOffset } from '@openfoundry/spi';
+import { SchemaGuardError, OpenFoundryError, encodeLinkCursor, decodeLinkCursor, assertCursorOrOffset } from '@openfoundry/spi';
 
 import { snakeCase, pgIdent } from '../schema/type-mapping.js';
 import { PgTransaction, resolveQueryable, withTransaction } from '../transactions/index.js';
@@ -392,14 +392,10 @@ export async function updateLink(
         [ctx.tenantId, linkId],
       );
       if (check.rows.length === 0) {
-        const err = new Error(`Link ${type}:${linkId} not found or deleted`) as Error & { code: string };
-        err.code = 'VERSION_CONFLICT';
-        throw err;
+        throw new OpenFoundryError({ code: 'VERSION_CONFLICT', category: 'conflict', message: `Link ${type}:${linkId} not found or deleted` });
       }
       const currentVersion = (check.rows[0] as Record<string, unknown>)['_version'];
-      const err = new Error(`Link ${type}:${linkId} version mismatch (expected ${expectedVersion}, current ${currentVersion})`) as Error & { code: string };
-      err.code = 'VERSION_CONFLICT';
-      throw err;
+      throw new OpenFoundryError({ code: 'VERSION_CONFLICT', category: 'conflict', message: `Link ${type}:${linkId} version mismatch (expected ${expectedVersion}, current ${currentVersion})` });
     }
     throw new Error(`Link ${type}:${linkId} not found or is deleted`);
   }

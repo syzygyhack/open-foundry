@@ -8,6 +8,7 @@
 
 import type { ErrorCategory, ErrorCode } from '@openfoundry/spi';
 import type { RestResponse } from './types.js';
+import { toClientError } from '../client-error.js';
 
 interface RestErrorOptions {
   code: ErrorCode;
@@ -73,54 +74,10 @@ export function createRestErrorResponse(opts: RestErrorOptions): RestResponse {
 }
 
 /**
- * Convert an unknown error into a REST error response.
- * Extracts error code if available, otherwise defaults to INTERNAL_ERROR.
+ * Convert an unknown error into a REST error response. Only a platform
+ * error keeps its code and message (see toClientError); anything else is
+ * INTERNAL_ERROR.
  */
 export function wrapErrorToRest(err: unknown, traceId?: string): RestResponse {
-  const rawMessage = err instanceof Error ? err.message : String(err);
-  const code = extractErrorCode(err);
-  const category = mapCodeToCategory(code);
-
-  // Never expose internal error messages to clients for system/timeout errors.
-  const message = (category === 'system' || category === 'timeout')
-    ? 'An internal error occurred'
-    : rawMessage;
-
-  return createRestErrorResponse({
-    code,
-    category,
-    message,
-    retryable: category === 'system' || category === 'timeout',
-    traceId,
-  });
-}
-
-function extractErrorCode(err: unknown): ErrorCode {
-  if (err && typeof err === 'object' && 'code' in err && typeof (err as Record<string, unknown>).code === 'string') {
-    return (err as Record<string, unknown>).code as ErrorCode;
-  }
-  return 'INTERNAL_ERROR';
-}
-
-function mapCodeToCategory(code: ErrorCode): ErrorCategory {
-  const mapping: Record<string, ErrorCategory> = {
-    VALIDATION_ERROR: 'validation',
-    INVALID_FILTER: 'validation',
-    SCHEMA_VIOLATION: 'validation',
-    UNAUTHORIZED: 'authorization',
-    FORBIDDEN: 'authorization',
-    CONSENT_DENIED: 'consent',
-    CONSENT_UNKNOWN: 'consent',
-    VERSION_CONFLICT: 'conflict',
-    OPTIMISTIC_LOCK_FAILED: 'conflict',
-    RATE_LIMITED: 'rate_limit',
-    QUOTA_EXCEEDED: 'quota',
-    OBJECT_NOT_FOUND: 'not_found',
-    LINK_NOT_FOUND: 'not_found',
-    TYPE_NOT_FOUND: 'not_found',
-    INTERNAL_ERROR: 'system',
-    PROVIDER_ERROR: 'system',
-    OPERATION_TIMEOUT: 'timeout',
-  };
-  return mapping[code] ?? 'system';
+  return createRestErrorResponse({ ...toClientError(err), traceId });
 }

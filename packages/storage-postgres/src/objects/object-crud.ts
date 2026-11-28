@@ -17,6 +17,7 @@ import type {
   ObjectPage,
   DateTime,
 } from '@openfoundry/spi';
+import { OpenFoundryError } from '@openfoundry/spi';
 import { snakeCase, pgIdent, fieldCol } from '../schema/type-mapping.js';
 
 import { filterToSql } from './filter-to-sql.js';
@@ -251,14 +252,10 @@ export async function updateObject(
           [ctx.tenantId, id],
         );
         if (check.rows.length === 0) {
-          const err = new Error(`Object ${type}:${id} not found or deleted`) as Error & { code: string };
-          err.code = 'VERSION_CONFLICT';
-          throw err;
+          throw new OpenFoundryError({ code: 'VERSION_CONFLICT', category: 'conflict', message: `Object ${type}:${id} not found or deleted` });
         }
         const currentVersion = (check.rows[0] as Record<string, unknown>)['_version'];
-        const err = new Error(`Object ${type}:${id} version mismatch (expected ${expectedVersion}, current ${currentVersion})`) as Error & { code: string };
-        err.code = 'VERSION_CONFLICT';
-        throw err;
+        throw new OpenFoundryError({ code: 'VERSION_CONFLICT', category: 'conflict', message: `Object ${type}:${id} version mismatch (expected ${expectedVersion}, current ${currentVersion})` });
       }
       throw new Error(`Object ${type}:${id} not found or is deleted`);
     }
@@ -340,13 +337,13 @@ export async function hardDeleteObject(
     const level = await tx.client.query<{ transaction_isolation: string }>('SHOW transaction_isolation');
     const isolation = level.rows[0]?.transaction_isolation;
     if (isolation !== 'read committed') {
-      throw Object.assign(
-        new Error(
+      throw new OpenFoundryError({
+        code: 'VALIDATION_ERROR',
+        category: 'validation',
+        message:
           `Hard delete of ${type}:${id} needs a READ COMMITTED transaction (this one is ${isolation}); ` +
-            'run it outside the transaction or at READ COMMITTED',
-        ),
-        { code: 'VALIDATION_ERROR' },
-      );
+          'run it outside the transaction or at READ COMMITTED',
+      });
     }
   }
 

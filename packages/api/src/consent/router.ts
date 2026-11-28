@@ -146,7 +146,9 @@ export async function applyConsentRecord(
       detail: { result: 'error', denialReason: message, after: { purpose, decision } },
       traceId,
     });
-    return { ok: false, code: 'CONSENT_WRITE_FAILED', category: 'system', message };
+    // The audit keeps the store's message; the caller gets a generic one (a
+    // connection error names hosts and ports).
+    return { ok: false, code: 'CONSENT_WRITE_FAILED', category: 'system', message: 'Consent write failed' };
   }
 }
 

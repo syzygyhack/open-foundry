@@ -19,6 +19,7 @@ import type {
   ObjectSetDefinition,
   ObjectSetStore,
 } from '@openfoundry/spi';
+import { OpenFoundryError } from '@openfoundry/spi';
 
 /** Error shapes match InMemoryObjectSetStore for cross-implementation parity. */
 function notFoundError(id: string): never {
@@ -80,10 +81,11 @@ export class PostgresObjectSetStore implements ObjectSetStore {
   ): Promise<ObjectSetDefinition> {
     // Enforce createdBy from request context — fail closed if unauthenticated.
     if (!ctx.actorId) {
-      throw Object.assign(
-        new Error('Cannot create object set without authenticated user'),
-        { code: 'UNAUTHENTICATED' },
-      );
+      throw new OpenFoundryError({
+        code: 'UNAUTHENTICATED',
+        category: 'authorization',
+        message: 'Cannot create object set without authenticated user',
+      });
     }
     await this.ensureSchema();
 

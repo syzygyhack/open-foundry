@@ -45,6 +45,7 @@ import {
   encodeLinkCursor,
   decodeLinkCursor,
   assertCursorOrOffset,
+  OpenFoundryError,
 } from '@openfoundry/spi';
 
 // ---------------------------------------------------------------------------
@@ -438,9 +439,7 @@ export class MemoryStorageProvider implements StorageProvider {
       throw new Error(`Object ${type}:${id} is deleted`);
     }
     if (expectedVersion !== undefined && existing._version !== expectedVersion) {
-      const err = new Error(`Object ${type}:${id} has version ${existing._version}, expected ${expectedVersion}`) as Error & { code: string };
-      err.code = 'VERSION_CONFLICT';
-      throw err;
+      throw new OpenFoundryError({ code: 'VERSION_CONFLICT', category: 'conflict', message: `Object ${type}:${id} has version ${existing._version}, expected ${expectedVersion}` });
     }
     const updated: OntologyObject = {
       ...existing,
@@ -584,9 +583,7 @@ export class MemoryStorageProvider implements StorageProvider {
       throw new Error(`Link ${type}:${linkId} not found`);
     }
     if (expectedVersion !== undefined && existing._version !== expectedVersion) {
-      const err = new Error(`Link ${type}:${linkId} has version ${existing._version}, expected ${expectedVersion}`) as Error & { code: string };
-      err.code = 'VERSION_CONFLICT';
-      throw err;
+      throw new OpenFoundryError({ code: 'VERSION_CONFLICT', category: 'conflict', message: `Link ${type}:${linkId} has version ${existing._version}, expected ${expectedVersion}` });
     }
     const updated: OntologyLink = {
       ...existing,

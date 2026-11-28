@@ -16,15 +16,19 @@
  */
 
 import type { FilterExpression, OntologySchema } from './ontology.js';
-import type { ErrorCode } from './errors.js';
+import type { ErrorCategory, ErrorCode } from './errors.js';
 
 /** An Error carrying a platform error code, as the API's error mapping reads it. */
 export class SchemaGuardError extends Error {
   readonly code: ErrorCode;
+  /** Not found for an undeclared type, validation otherwise: a PlatformError. */
+  readonly category: ErrorCategory;
+  readonly retryable = false;
   constructor(code: ErrorCode, message: string) {
     super(message);
     this.name = 'SchemaGuardError';
     this.code = code;
+    this.category = code === 'TYPE_NOT_FOUND' ? 'not_found' : 'validation';
   }
 }
 

@@ -1,5 +1,6 @@
 import { GraphQLError } from 'graphql';
 import type { ErrorCategory, ErrorCode } from '@openfoundry/spi';
+import { toClientError } from '../client-error.js';
 
 /**
  * Unified error model (Section 8.8).
@@ -15,12 +16,18 @@ interface OpenFoundryErrorOptions {
   traceId?: string;
 }
 
+/** The errors createOpenFoundryError built: the only ones wrapError passes as they are. */
+const built = new WeakSet<GraphQLError>();
+
 /**
  * Create a GraphQL error with Open Foundry extensions.
  */
 export function createOpenFoundryError(opts: OpenFoundryErrorOptions): GraphQLError {
-  return new GraphQLError(opts.message, {
+  const err = new GraphQLError(opts.message, {
     extensions: {
+      // Mirrors openfoundry.code where GraphQL clients look first; without it
+      // Apollo Server fills in INTERNAL_SERVER_ERROR, whatever the error was.
+      code: opts.code,
       openfoundry: {
         code: opts.code,
         category: opts.category,
@@ -31,61 +38,22 @@ export function createOpenFoundryError(opts: OpenFoundryErrorOptions): GraphQLEr
       },
     },
   });
+  built.add(err);
+  return err;
 }
 
 /**
  * Wrap an unknown error into a GraphQL-safe Open Foundry error.
  */
 export function wrapError(err: unknown, traceId?: string): GraphQLError {
-  if (err instanceof GraphQLError) {
+  // One the API built (createOpenFoundryError) passes as it is; any other
+  // GraphQLError, say from a provider's own GraphQL client, is classified
+  // like other errors, so its code and message do not reach the client,
+  // whatever extensions it carries.
+  if (err instanceof GraphQLError && built.has(err)) {
     return err;
   }
 
-  const rawMessage = err instanceof Error ? err.message : String(err);
-  const code = extractErrorCode(err);
-  const category = mapCodeToCategory(code);
-
-  // Never expose internal error messages to clients for system/timeout errors.
-  // Validation, authz, consent, and conflict messages are user-facing and safe.
-  const message = (category === 'system' || category === 'timeout')
-    ? 'An internal error occurred'
-    : rawMessage;
-
-  return createOpenFoundryError({
-    code,
-    category,
-    message,
-    retryable: category === 'system' || category === 'timeout',
-    traceId,
-  });
-}
-
-function extractErrorCode(err: unknown): ErrorCode {
-  if (err && typeof err === 'object' && 'code' in err && typeof (err as Record<string, unknown>).code === 'string') {
-    return (err as Record<string, unknown>).code as ErrorCode;
-  }
-  return 'INTERNAL_ERROR';
-}
-
-function mapCodeToCategory(code: ErrorCode): ErrorCategory {
-  const mapping: Record<string, ErrorCategory> = {
-    VALIDATION_ERROR: 'validation',
-    INVALID_FILTER: 'validation',
-    SCHEMA_VIOLATION: 'validation',
-    UNAUTHORIZED: 'authorization',
-    FORBIDDEN: 'authorization',
-    CONSENT_DENIED: 'consent',
-    CONSENT_UNKNOWN: 'consent',
-    VERSION_CONFLICT: 'conflict',
-    OPTIMISTIC_LOCK_FAILED: 'conflict',
-    RATE_LIMITED: 'rate_limit',
-    QUOTA_EXCEEDED: 'quota',
-    OBJECT_NOT_FOUND: 'not_found',
-    LINK_NOT_FOUND: 'not_found',
-    TYPE_NOT_FOUND: 'not_found',
-    INTERNAL_ERROR: 'system',
-    PROVIDER_ERROR: 'system',
-    OPERATION_TIMEOUT: 'timeout',
-  };
-  return mapping[code] ?? 'system';
+  // Only a platform error keeps its code and message (see toClientError).
+  return createOpenFoundryError({ ...toClientError(err), traceId });
 }
